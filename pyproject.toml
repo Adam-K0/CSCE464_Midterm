@@ -1,0 +1,7 @@
+[project]
+name = "csce464-midterm"
+version = "0.1.0"
+description = "Designed to aid presding officers in NSDA Congressional Debate"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = []

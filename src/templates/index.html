@@ -1,0 +1,26 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="page-header">
+  <h1>Our Products</h1>
+  <p class="subtitle">Browse our collection of premium tech accessories</p>
+</section>
+
+<!-- Category filter buttons (populated by JS) -->
+<div id="categoryFilter" class="category-filter"></div>
+
+<!-- Product grid (populated by JS) -->
+<div id="productGrid" class="grid"></div>
+
+<!-- Loading indicator -->
+<div id="loading" class="loading">
+  <div class="spinner"></div>
+  <p>Loading products...</p>
+</div>
+
+<!-- Load more area -->
+<div class="load-more-area">
+  <button id="loadMoreBtn" class="btn btn-primary" style="display:none;">Load more...</button>
+</div>
+
+{% endblock %}

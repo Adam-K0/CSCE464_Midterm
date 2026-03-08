@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{{ title or "eShop" }}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+
+  <!-- ===== Navbar ===== -->
+  <header class="navbar">
+    <div class="navbar-inner">
+      <a href="/" class="brand">
+        <span class="brand-icon">&#128722;</span> eShop
+      </a>
+      <nav class="nav-links">
+        <a href="/" class="nav-link">Products</a>
+        <a href="/cart" class="nav-link cart-link">
+          <span class="cart-icon">&#128722;</span>
+          Cart
+          <span id="cartCount" class="badge">0</span>
+        </a>
+        {% if current_user %}
+          <a href="/orders" class="nav-link">Orders</a>
+          <a href="/profile" class="nav-user">Hi, {{ current_user.name }}</a>
+          <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+        {% else %}
+          <a href="/login" class="nav-link">Login</a>
+          <a href="/register" class="nav-link">Register</a>
+        {% endif %}
+      </nav>
+    </div>
+  </header>
+
+  <!-- ===== Toast notification ===== -->
+  <div id="toast" class="toast hidden"></div>
+
+  <!-- ===== Main content ===== -->
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <!-- ===== Footer ===== -->
+  <footer class="footer">
+    <p>&copy; 2026 eShop &mdash; Course Demo Project</p>
+  </footer>
+
+  <script src="/static/app.js"></script>
+  <script>
+    const logoutBtn = document.getElementById("logoutBtn");
+    if (logoutBtn) {
+      logoutBtn.addEventListener("click", async (e) => {
+        e.preventDefault();
+        await fetch("/api/logout", { method: "POST" });
+        window.location.href = "/";
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block content %}
+
+<section class="page-header">
+  <h1>My Profile</h1>
+  <p class="subtitle">Manage your account</p>
+</section>
+
+<div class="profile-card">
+  <div class="profile-info">
+    <div class="profile-row">
+      <span class="profile-label">Name</span>
+      <span class="profile-value">{{ current_user.name }}</span>
+    </div>
+    <div class="profile-row">
+      <span class="profile-label">Email</span>
+      <span class="profile-value">{{ current_user.email }}</span>
+    </div>
+  </div>
+
+  <hr class="profile-divider">
+
+  <div class="profile-danger-zone">
+    <h3>Danger Zone</h3>
+    <p>Once you delete your account, there is no going back.</p>
+    <button id="deleteAccountBtn" class="btn btn-danger">Delete My Account</button>
+    <p id="deleteMsg" class="auth-msg"></p>
+  </div>
+</div>
+
+{% endblock %}
