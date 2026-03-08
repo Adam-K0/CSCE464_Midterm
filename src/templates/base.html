@@ -3,43 +3,72 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>{% block title %}Congressional Debate{% endblock %}</title>
+  <title>{% block title %}Session Buddy{% endblock %}</title>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          colors: {
+            'sb-navy': '#002E5D',
+            'sb-navy-light': '#003A75',
+            'sb-navy-dark': '#001F3F',
+            'sb-red': '#C8102E',
+            'sb-gold': '#FFB81C',
+            'sb-gold-light': '#FFD166',
+          }
+        }
+      }
+    }
+  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body class="bg-gray-100 min-h-screen flex flex-col">
+<body class="min-h-screen flex flex-col" style="background:var(--sb-off-white)">
 
-  <!-- Nav -->
-  <nav class="bg-white shadow">
-    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-      <a href="/" class="text-lg font-bold text-blue-700">Congress</a>
-      <div class="flex items-center gap-3 text-sm">
+  <!-- Navbar -->
+  <nav class="sb-nav">
+    <div class="max-w-5xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="flex items-center gap-2 text-white font-extrabold text-lg tracking-tight">
+        <svg class="w-7 h-7 text-sb-gold" fill="currentColor" viewBox="0 0 24 24"><path d="M12 2L2 7l10 5 10-5-10-5zM2 17l10 5 10-5M2 12l10 5 10-5"/></svg>
+        <span>Session Buddy</span>
+      </a>
+      <div class="flex items-center gap-4 text-sm">
         {% if current_user %}
-          <span class="text-gray-600">{{ current_user.name }}</span>
-          <a href="#" id="logoutBtn" class="text-red-600 hover:underline">Logout</a>
+          <span class="text-sb-gold font-semibold">{{ current_user.name }}</span>
+          <a href="#" id="logoutBtn" class="text-white/70 hover:text-white transition">Logout</a>
         {% else %}
-          <a href="/login" class="text-blue-600 hover:underline">Login</a>
-          <a href="/register" class="text-blue-600 hover:underline">Register</a>
+          <a href="/login" class="text-white/80 hover:text-white transition font-medium">Login</a>
+          <a href="/register" class="bg-sb-gold text-sb-navy-dark font-bold px-3 py-1.5 rounded hover:bg-sb-gold-light transition text-xs uppercase tracking-wide">Register</a>
         {% endif %}
         {% if is_po %}
-          <a href="/po" class="text-green-700 font-semibold hover:underline">PO Dashboard</a>
-          <a href="#" id="poLogoutBtn" class="text-red-600 hover:underline text-xs">(PO Logout)</a>
+          <a href="/po" class="bg-sb-red text-white font-bold px-3 py-1.5 rounded hover:bg-red-700 transition text-xs uppercase tracking-wide">PO Dashboard</a>
+          <a href="#" id="poLogoutBtn" class="text-white/50 hover:text-white transition text-xs">(PO Logout)</a>
         {% else %}
-          <a href="/po/login" class="text-gray-400 hover:underline text-xs">PO</a>
+          <a href="/po/login" class="text-white/40 hover:text-white/70 transition text-xs">PO Access</a>
         {% endif %}
       </div>
     </div>
   </nav>
+  <div class="sb-accent-bar"></div>
 
   <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
   <!-- Main content -->
-  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
+  <main class="flex-1 max-w-5xl mx-auto w-full px-4 py-8">
     {% block content %}{% endblock %}
   </main>
 
-  <footer class="text-center text-xs text-gray-400 py-4">NSDA Congressional Debate Tracker</footer>
+  <!-- Footer -->
+  <footer class="sb-footer text-center text-xs py-5">
+    <div class="max-w-5xl mx-auto px-4">
+      <p class="mb-1">Session Buddy</p>
+      <p class="opacity-60">Congressional Debate Presiding Officer Helper</p>
+    </div>
+  </footer>
 
   <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>

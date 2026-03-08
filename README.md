@@ -1,5 +1,5 @@
-# Presiding Officer Helper
-See [NSDA Congressional Debate Guidelines](https://www.speechanddebate.org/wp-content/uploads/Congressional-Debate-Guide.pdf), specifically Units 6-8 
+# Session Buddy
+A Presiding Officer helper for congressional debate sessions.
 
 
 ## Stack

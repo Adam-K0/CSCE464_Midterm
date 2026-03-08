@@ -1,35 +1,48 @@
 {% extends "base.html" %}
-{% block title %}PO Dashboard — Congressional Debate{% endblock %}
+{% block title %}PO Dashboard — Session Buddy{% endblock %}
 {% block content %}
 <div id="poDashboard">
-  <h1 class="text-2xl font-bold mb-4">Presiding Officer Dashboard</h1>
+  <!-- Header -->
+  <div class="flex items-center justify-between mb-6">
+    <div>
+      <h1 class="text-2xl font-extrabold section-title">Presiding Officer Dashboard</h1>
+      <p class="text-sm text-gray-400 mt-0.5">Manage the chamber session</p>
+    </div>
+    <button onclick="resetSession()" class="btn btn-red btn-sm uppercase tracking-wide">Reset Session</button>
+  </div>
 
   <!-- Add legislation -->
-  <div class="card p-4 mb-4">
-    <h2 class="text-lg font-semibold mb-2">Add Legislation</h2>
-    <form id="addLegForm" class="space-y-2">
-      <input type="text" id="legTitle" class="form-input" placeholder="Title / Bill Number" required>
-      <input type="text" id="legSchool" class="form-input" placeholder="Authoring School" required>
+  <div class="card p-5 mb-5">
+    <h2 class="text-base font-bold text-sb-navy mb-3 flex items-center gap-2">
+      <svg class="w-5 h-5 text-sb-gold" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/></svg>
+      Add Legislation
+    </h2>
+    <form id="addLegForm" class="space-y-3">
+      <div class="grid md:grid-cols-2 gap-3">
+        <input type="text" id="legTitle" class="form-input" placeholder="Title / Bill Number" required>
+        <input type="text" id="legSchool" class="form-input" placeholder="Authoring School" required>
+      </div>
       <textarea id="legBody" class="form-input" placeholder="Description (optional)"></textarea>
-      <button type="submit" class="btn btn-green">Add to Docket</button>
+      <button type="submit" class="btn btn-green text-sm">Add to Docket</button>
     </form>
   </div>
 
   <!-- Legislation list -->
-  <div class="card p-4 mb-4">
-    <h2 class="text-lg font-semibold mb-2">Docket</h2>
-    <div id="legList"><p class="text-gray-500 text-sm">Loading...</p></div>
+  <div class="card p-5 mb-5">
+    <h2 class="text-base font-bold text-sb-navy mb-3 flex items-center gap-2">
+      <svg class="w-5 h-5 text-sb-navy" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"/></svg>
+      Legislation Docket
+    </h2>
+    <div id="legList"><p class="text-gray-400 text-sm">Loading...</p></div>
   </div>
 
   <!-- Debate panel -->
-  <div class="card p-4 mb-4">
-    <h2 class="text-lg font-semibold mb-2">Current Debate</h2>
-    <div id="debatePanel"><p class="text-gray-500">No active debate.</p></div>
-  </div>
-
-  <!-- Session controls -->
-  <div class="text-right">
-    <button onclick="resetSession()" class="btn btn-red btn-sm">Reset Entire Session</button>
+  <div class="card p-5 mb-5">
+    <h2 class="text-base font-bold text-sb-navy mb-3 flex items-center gap-2">
+      <svg class="w-5 h-5 text-sb-red" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+      Current Debate
+    </h2>
+    <div id="debatePanel"><p class="text-gray-400">No active debate.</p></div>
   </div>
 </div>
 {% endblock %}

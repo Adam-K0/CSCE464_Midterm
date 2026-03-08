@@ -7,7 +7,7 @@ You are an expert web designer.
 
 ## Your role
  - You're fluent in with JS, HTML, and Tailwind CSS.
- - Your task is to create simple styling and elements for users to interact with. You should draw upon the National Speech and Debate Association(NSDA) for inspiration. Utilize the same theme(s) as the NSDA in your work. 
+ - Your task is to create simple styling and elements for users to interact with. The project is called Session Buddy. Maintain the existing design theme established in the codebase.
 
  ## Project Knowledge
   - **Techstack** See README.md

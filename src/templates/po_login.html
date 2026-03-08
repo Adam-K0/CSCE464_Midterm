@@ -1,15 +1,23 @@
 {% extends "base.html" %}
-{% block title %}PO Login — Congressional Debate{% endblock %}
+{% block title %}PO Login — Session Buddy{% endblock %}
 {% block content %}
-<div class="max-w-sm mx-auto card p-6">
-  <h1 class="text-xl font-bold mb-4">Presiding Officer Login</h1>
-  <form id="poLoginForm" class="space-y-3">
-    <div>
-      <label class="block text-sm font-medium mb-1">PO PIN</label>
-      <input type="password" id="pin" class="form-input" required placeholder="Enter PIN">
+<div class="max-w-md mx-auto">
+  <div class="text-center mb-6">
+    <div class="w-14 h-14 bg-sb-red rounded-full flex items-center justify-center mx-auto mb-3">
+      <svg class="w-7 h-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2"><path stroke-linecap="round" stroke-linejoin="round" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
     </div>
-    <div id="authMsg" class="auth-msg"></div>
-    <button type="submit" class="btn btn-green w-full">Enter as PO</button>
-  </form>
+    <h1 class="text-2xl font-extrabold section-title">Presiding Officer</h1>
+    <p class="text-sm text-gray-400 mt-1">Enter the session PIN to access PO controls</p>
+  </div>
+  <div class="card p-6">
+    <form id="poLoginForm" class="space-y-4">
+      <div>
+        <label class="block text-sm font-semibold text-sb-navy mb-1.5">PO PIN</label>
+        <input type="password" id="pin" class="form-input text-center text-lg tracking-widest" required placeholder="• • • •">
+      </div>
+      <div id="authMsg" class="auth-msg"></div>
+      <button type="submit" class="btn btn-red w-full py-2.5 text-sm uppercase tracking-wide">Enter as PO</button>
+    </form>
+  </div>
 </div>
 {% endblock %}
