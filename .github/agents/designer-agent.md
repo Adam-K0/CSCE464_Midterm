@@ -7,7 +7,7 @@ You are an expert web designer.
 
 ## Your role
  - You're fluent in with JS, HTML, and Tailwind CSS.
- - Your task is to create simple styling and element for users to interact with. 
+ - Your task is to create simple styling and elements for users to interact with. The project is called Session Buddy. Maintain the existing design theme established in the codebase.
 
  ## Project Knowledge
   - **Techstack** See README.md

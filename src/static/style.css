@@ -1,56 +1,98 @@
-/* Congressional Debate — Custom styles (Tailwind handles the rest) */
+/* ===================================================================
+   Session Buddy — Custom styles
+   Brand: Navy #002E5D · Red #C8102E · Gold #FFB81C
+   =================================================================== */
 
-/* Toast notifications */
+/* --- CSS Custom Properties --- */
+:root {
+  --sb-navy: #002E5D;
+  --sb-navy-light: #003A75;
+  --sb-navy-dark: #001F3F;
+  --sb-red: #C8102E;
+  --sb-red-dark: #A00D24;
+  --sb-gold: #FFB81C;
+  --sb-gold-light: #FFD166;
+  --sb-white: #FFFFFF;
+  --sb-off-white: #F7F8FA;
+  --sb-gray-100: #F1F3F5;
+  --sb-gray-200: #DEE2E6;
+  --sb-gray-400: #868E96;
+  --sb-gray-600: #495057;
+  --sb-gray-800: #212529;
+  --sb-font: 'Inter', system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --sb-radius: 0.5rem;
+  --sb-shadow: 0 1px 3px rgba(0,0,0,.08), 0 1px 2px rgba(0,0,0,.06);
+  --sb-shadow-md: 0 4px 12px rgba(0,46,93,.1);
+}
+
+/* --- Base resets --- */
+body {
+  font-family: var(--sb-font);
+  background: var(--sb-off-white);
+  color: var(--sb-gray-800);
+}
+
+/* --- Toast notifications --- */
 .toast {
   position: fixed;
   top: 1rem;
   right: 1rem;
   padding: 0.75rem 1.25rem;
-  border-radius: 0.5rem;
+  border-radius: var(--sb-radius);
   color: #fff;
   font-size: 0.875rem;
   z-index: 9999;
-  transition: opacity 0.3s;
+  transition: opacity 0.3s, transform 0.3s;
+  box-shadow: var(--sb-shadow-md);
 }
-.toast.hidden { opacity: 0; pointer-events: none; }
+.toast.hidden { opacity: 0; pointer-events: none; transform: translateY(-0.5rem); }
 .toast-success { background: #16a34a; }
-.toast-error   { background: #dc2626; }
-.toast-info    { background: #2563eb; }
+.toast-error   { background: var(--sb-red); }
+.toast-info    { background: var(--sb-navy); }
 
-/* Card helper */
+/* --- Card --- */
 .card {
-  background: #fff;
-  border: 1px solid #e5e7eb;
-  border-radius: 0.5rem;
+  background: var(--sb-white);
+  border: 1px solid var(--sb-gray-200);
+  border-radius: var(--sb-radius);
+  box-shadow: var(--sb-shadow);
 }
 
-/* Buttons */
+/* --- Buttons --- */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  padding: 0.5rem 1rem;
-  border-radius: 0.375rem;
+  padding: 0.5rem 1.25rem;
+  border-radius: var(--sb-radius);
   font-size: 0.875rem;
   font-weight: 600;
   cursor: pointer;
   border: none;
-  transition: background 0.15s;
+  transition: background 0.2s, box-shadow 0.2s, transform 0.1s;
+  letter-spacing: 0.01em;
 }
-.btn-sm { padding: 0.25rem 0.5rem; font-size: 0.75rem; }
+.btn:active { transform: scale(0.97); }
+.btn-sm { padding: 0.25rem 0.625rem; font-size: 0.75rem; }
+
+.btn-primary { background: var(--sb-navy); color: #fff; }
+.btn-primary:hover { background: var(--sb-navy-light); box-shadow: 0 2px 8px rgba(0,46,93,.25); }
+
 .btn-green  { background: #16a34a; color: #fff; }
 .btn-green:hover { background: #15803d; }
-.btn-red    { background: #dc2626; color: #fff; }
-.btn-red:hover { background: #b91c1c; }
-.btn-blue   { background: #2563eb; color: #fff; }
-.btn-blue:hover { background: #1d4ed8; }
-.btn-gray   { background: #6b7280; color: #fff; }
-.btn-gray:hover { background: #4b5563; }
+.btn-red    { background: var(--sb-red); color: #fff; }
+.btn-red:hover { background: var(--sb-red-dark); }
+.btn-blue   { background: var(--sb-navy); color: #fff; }
+.btn-blue:hover { background: var(--sb-navy-light); }
+.btn-gold   { background: var(--sb-gold); color: var(--sb-navy-dark); }
+.btn-gold:hover { background: var(--sb-gold-light); }
+.btn-gray   { background: var(--sb-gray-400); color: #fff; }
+.btn-gray:hover { background: var(--sb-gray-600); }
 
-/* Badges */
+/* --- Badges --- */
 .badge {
   display: inline-block;
-  padding: 0.125rem 0.5rem;
+  padding: 0.15rem 0.55rem;
   border-radius: 9999px;
   font-size: 0.625rem;
   font-weight: 700;
@@ -60,25 +102,101 @@
   margin-left: 0.25rem;
 }
 .badge-green  { background: #dcfce7; color: #166534; }
-.badge-blue   { background: #dbeafe; color: #1e40af; }
-.badge-yellow { background: #fef9c3; color: #854d0e; }
-.badge-gray   { background: #f3f4f6; color: #374151; }
+.badge-blue   { background: #dbeafe; color: var(--sb-navy); }
+.badge-yellow { background: #fef3c7; color: #92400e; }
+.badge-gray   { background: var(--sb-gray-100); color: var(--sb-gray-600); }
 
-/* Form inputs */
+/* --- Form inputs --- */
 .form-input {
   display: block;
   width: 100%;
-  padding: 0.5rem 0.75rem;
-  border: 1px solid #d1d5db;
-  border-radius: 0.375rem;
+  padding: 0.6rem 0.85rem;
+  border: 1px solid var(--sb-gray-200);
+  border-radius: var(--sb-radius);
   font-size: 0.875rem;
+  background: var(--sb-white);
+  transition: border-color 0.2s, box-shadow 0.2s;
 }
 .form-input:focus {
   outline: none;
-  border-color: #2563eb;
-  box-shadow: 0 0 0 2px rgba(37, 99, 235, 0.2);
+  border-color: var(--sb-navy);
+  box-shadow: 0 0 0 3px rgba(0, 46, 93, 0.15);
 }
 textarea.form-input { resize: vertical; min-height: 4rem; }
 
-/* Auth message */
-.auth-msg { color: #dc2626; font-size: 0.875rem; margin-top: 0.5rem; min-height: 1.25rem; }
+/* --- Auth message --- */
+.auth-msg { color: var(--sb-red); font-size: 0.875rem; margin-top: 0.5rem; min-height: 1.25rem; }
+
+/* --- Navbar --- */
+.sb-nav {
+  background: var(--sb-navy);
+  box-shadow: 0 2px 8px rgba(0, 46, 93, .25);
+}
+.sb-nav a { transition: color 0.15s, opacity 0.15s; }
+.sb-nav a:hover { opacity: 0.85; }
+
+/* --- Gold accent bar under navbar --- */
+.sb-accent-bar {
+  height: 3px;
+  background: linear-gradient(90deg, var(--sb-gold), var(--sb-red), var(--sb-gold));
+}
+
+/* --- Hero section for landing page --- */
+.sb-hero {
+  background: linear-gradient(135deg, var(--sb-navy) 0%, var(--sb-navy-light) 50%, var(--sb-navy-dark) 100%);
+  color: var(--sb-white);
+  position: relative;
+  overflow: hidden;
+}
+.sb-hero::before {
+  content: '';
+  position: absolute;
+  top: -50%;
+  right: -20%;
+  width: 60%;
+  height: 200%;
+  background: radial-gradient(ellipse, rgba(255,184,28,0.08) 0%, transparent 70%);
+  pointer-events: none;
+}
+
+/* --- Footer --- */
+.sb-footer {
+  background: var(--sb-navy-dark);
+  color: rgba(255,255,255,0.5);
+}
+
+/* --- Section headers --- */
+.section-title {
+  font-weight: 800;
+  color: var(--sb-navy);
+  letter-spacing: -0.01em;
+}
+
+/* --- Debate phase cards --- */
+.phase-card-aff {
+  background: #f0fdf4;
+  border-color: #86efac;
+}
+.phase-card-neg {
+  background: #fef2f2;
+  border-color: #fca5a5;
+}
+.phase-card-question {
+  background: #eff6ff;
+  border-color: #93c5fd;
+}
+.phase-card-speaking {
+  background: #fffbeb;
+  border-color: var(--sb-gold);
+}
+
+/* --- Scrollbar --- */
+::-webkit-scrollbar { width: 8px; }
+::-webkit-scrollbar-track { background: var(--sb-gray-100); }
+::-webkit-scrollbar-thumb { background: var(--sb-gray-400); border-radius: 4px; }
+::-webkit-scrollbar-thumb:hover { background: var(--sb-gray-600); }
+
+/* --- Smooth transitions for dynamic elements --- */
+#speakerDashboard, #poDashboard, #debatePanel, #legList {
+  transition: opacity 0.15s;
+}

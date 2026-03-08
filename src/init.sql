@@ -1,4 +1,4 @@
--- Congressional Debate — Presiding Officer Helper
+-- Session Buddy — Presiding Officer Helper
 -- Run: mysql -u root < init.sql
 
 CREATE DATABASE IF NOT EXISTS congress_debate CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci;

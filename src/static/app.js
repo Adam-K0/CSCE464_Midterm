@@ -1,4 +1,4 @@
-/* ===== Congressional Debate — Client JS ===== */
+/* ===== Session Buddy — Client JS ===== */
 
 // ---------------------------------------------------------------------------
 // Utility
@@ -138,16 +138,19 @@ function renderSpeakerView(s) {
 
   if (s.phase === "idle" || !s.active_legislation) {
     el.innerHTML =
-      '<div class="card text-center p-8">' +
-        '<h2 class="text-xl font-semibold mb-2">Waiting for Debate</h2>' +
-        '<p class="text-gray-500">The Presiding Officer has not opened debate on any legislation yet.</p>' +
+      '<div class="card text-center p-10">' +
+        '<div class="w-16 h-16 bg-sb-navy/10 rounded-full flex items-center justify-center mx-auto mb-4">' +
+          '<svg class="w-8 h-8 text-sb-navy/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+        '</div>' +
+        '<h2 class="text-xl font-bold section-title mb-2">Waiting for Debate</h2>' +
+        '<p class="text-gray-400">The Presiding Officer has not opened debate on any legislation yet.</p>' +
       '</div>';
     return;
   }
 
   var leg = s.active_legislation;
   var side = s.next_side ? "Affirmative" : "Negative";
-  var sideColor = s.next_side ? "text-green-700" : "text-red-700";
+  var sideColor = s.next_side ? "text-green-700" : "text-sb-red";
 
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
@@ -156,11 +159,11 @@ function renderSpeakerView(s) {
   // Speech history
   var historyHtml = "";
   if (s.speeches.length) {
-    historyHtml = '<div class="mb-4"><h3 class="font-semibold mb-1">Speeches Given</h3><ol class="list-decimal ml-5 text-sm">';
+    historyHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-2 text-sm uppercase tracking-wide">Speech History</h3><ol class="list-decimal ml-5 text-sm space-y-1">';
     for (var i = 0; i < s.speeches.length; i++) {
       var sp = s.speeches[i];
-      var tag = sp.is_affirmative ? '<span class="text-green-700">AFF</span>' : '<span class="text-red-700">NEG</span>';
-      historyHtml += '<li>' + sp.full_name + ' (' + sp.school + ') &mdash; ' + tag + ' [' + sp.speech_type + ']</li>';
+      var tag = sp.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      historyHtml += '<li class="text-gray-600">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
     }
     historyHtml += '</ol></div>';
   }
@@ -170,25 +173,26 @@ function renderSpeakerView(s) {
   if (s.phase === "speech_in_progress" && s.current_speech) {
     var cs = s.current_speech;
     var ctag = cs.is_affirmative ? "AFF" : "NEG";
+    var ctagColor = cs.is_affirmative ? "text-green-700" : "text-sb-red";
     currentHtml =
-      '<div class="card bg-yellow-50 border-yellow-300 mb-4 p-4">' +
-        '<h3 class="font-semibold">Speech In Progress</h3>' +
-        '<p class="text-lg">' + cs.full_name + ' (' + cs.school + ') &mdash; ' + ctag + '</p>' +
+      '<div class="card phase-card-speaking mb-4 p-5">' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Speech In Progress</h3></div>' +
+        '<p class="text-lg font-semibold">' + cs.full_name + ' <span class="text-gray-400 font-normal">(' + cs.school + ')</span> &mdash; <span class="' + ctagColor + ' font-bold">' + ctag + '</span></p>' +
       '</div>';
   } else if (s.phase === "questioning" && s.current_speech) {
     var cs2 = s.current_speech;
     currentHtml =
-      '<div class="card bg-blue-50 border-blue-300 mb-4 p-4">' +
-        '<h3 class="font-semibold">Questioning Period</h3>' +
-        '<p>Questions for: ' + cs2.full_name + ' (' + cs2.school + ')</p>' +
-        '<button onclick="requestToQuestion()" class="btn btn-blue mt-2">Raise Hand to Question</button>' +
+      '<div class="card phase-card-question mb-4 p-5">' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-navy rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Questioning Period</h3></div>' +
+        '<p class="mb-3">Questions for: <strong>' + cs2.full_name + '</strong> (' + cs2.school + ')</p>' +
+        '<button onclick="requestToQuestion()" class="btn btn-primary">Raise Hand to Question</button>' +
       '</div>';
     if (s.question_queue.length) {
-      currentHtml += '<div class="mb-4"><h4 class="font-semibold text-sm">Question Queue</h4><ol class="list-decimal ml-5 text-sm">';
+      currentHtml += '<div class="card p-4 mb-4"><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mb-2">Question Queue</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
       for (var j = 0; j < s.question_queue.length; j++) {
         var q = s.question_queue[j];
-        var st = q.status === "asking" ? " <strong>(asking now)</strong>" : "";
-        currentHtml += '<li>' + q.full_name + ' (' + q.school + ')' + st + '</li>';
+        var st = q.status === "asking" ? ' <span class="badge badge-yellow">ASKING NOW</span>' : "";
+        currentHtml += '<li class="text-gray-600">' + q.full_name + ' <span class="text-gray-400">(' + q.school + ')</span>' + st + '</li>';
       }
       currentHtml += '</ol></div>';
     }
@@ -197,32 +201,32 @@ function renderSpeakerView(s) {
   // Speech queue
   var queueHtml = "";
   if (s.speech_queue.length) {
-    queueHtml = '<div class="mb-4"><h3 class="font-semibold mb-1">Speech Queue</h3><ol class="list-decimal ml-5 text-sm">';
+    queueHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-2 text-sm uppercase tracking-wide">Speech Queue</h3><div class="space-y-1">';
     for (var k = 0; k < s.speech_queue.length; k++) {
       var sq = s.speech_queue[k];
-      var qtag = sq.is_affirmative ? '<span class="text-green-700">AFF</span>' : '<span class="text-red-700">NEG</span>';
-      queueHtml += '<li>' + sq.full_name + ' (' + sq.school + ') &mdash; ' + qtag + ' [speeches: ' + sq.total_speeches + ']</li>';
+      var qtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      queueHtml += '<div class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 text-sm"><span class="text-gray-400 font-mono text-xs">' + (k+1) + '.</span> ' + sq.full_name + ' <span class="text-gray-400">(' + sq.school + ')</span> &mdash; ' + qtag + ' <span class="text-gray-400">[' + sq.total_speeches + ' speeches]</span></div>';
     }
-    queueHtml += '</ol></div>';
+    queueHtml += '</div></div>';
   }
 
   // Request to speak buttons
   var actionHtml = "";
   if (s.phase === "speech_queue" || s.phase === "speech_in_progress") {
     actionHtml =
-      '<div class="flex gap-2 mb-4">' +
-        '<button onclick="requestToSpeak(true)" class="btn btn-green">Speak Affirmative</button>' +
-        '<button onclick="requestToSpeak(false)" class="btn btn-red">Speak Negative</button>' +
+      '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-3 text-sm uppercase tracking-wide">Raise Your Hand</h3><div class="flex flex-wrap gap-2">' +
+        '<button onclick="requestToSpeak(true)" class="btn btn-green">&#9757; Speak Affirmative</button>' +
+        '<button onclick="requestToSpeak(false)" class="btn btn-red">&#9757; Speak Negative</button>' +
         '<button onclick="cancelSpeechRequest()" class="btn btn-gray">Cancel Request</button>' +
-      '</div>';
+      '</div></div>';
   }
 
   el.innerHTML =
-    '<div class="card mb-4 p-4">' +
-      '<h2 class="text-xl font-bold mb-1">' + leg.title + '</h2>' +
-      '<p class="text-sm text-gray-500 mb-2">Authored by: ' + leg.school + '</p>' +
-      (leg.body ? '<p class="text-sm mb-3">' + leg.body + '</p>' : '') +
-      '<p class="font-semibold">Next speech needed: <span class="' + sideColor + '">' + side + '</span> ' + speechLabel + '</p>' +
+    '<div class="card mb-4 p-5 border-l-4" style="border-left-color:var(--sb-navy)">' +
+      '<h2 class="text-xl font-extrabold text-sb-navy mb-1">' + leg.title + '</h2>' +
+      '<p class="text-sm text-gray-400 mb-2">Authored by: ' + leg.school + '</p>' +
+      (leg.body ? '<p class="text-sm text-gray-600 mb-3">' + leg.body + '</p>' : '') +
+      '<p class="font-semibold text-sm">Next speech needed: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
     '</div>' +
     currentHtml +
     actionHtml +
@@ -300,7 +304,7 @@ async function loadLegislation() {
   try {
     var data = await api("/api/legislation");
     if (!data.legislation.length) {
-      el.innerHTML = '<p class="text-gray-500 text-sm">No legislation added yet.</p>';
+      el.innerHTML = '<p class="text-gray-400 text-sm">No legislation added yet.</p>';
       return;
     }
     var html = "";
@@ -311,16 +315,18 @@ async function loadLegislation() {
         : l.status === "active"
         ? '<span class="badge badge-green">Active</span>'
         : '<span class="badge badge-blue">Pending</span>';
+      var borderColor = l.status === "active" ? 'border-left-color:#16a34a' : l.status === "completed" ? 'border-left-color:var(--sb-gray-400)' : 'border-left-color:var(--sb-navy)';
       html +=
-        '<div class="card p-3 mb-2 flex items-center justify-between">' +
+        '<div class="card p-3 mb-2 flex items-center justify-between border-l-4" style="' + borderColor + '">' +
           '<div>' +
-            '<span class="font-semibold">' + l.leg_order + '.</span> ' + l.title +
+            '<span class="font-bold text-sb-navy">' + l.leg_order + '.</span> ' +
+            '<span class="font-semibold">' + l.title + '</span>' +
             ' <span class="text-xs text-gray-400">(' + l.school + ')</span> ' +
             statusBadge +
           '</div>' +
           '<div class="flex gap-1">' +
-            (l.status === "pending" ? '<button onclick="openDebate(' + l.id + ')" class="btn btn-sm btn-green">Open Debate</button>' : '') +
-            (l.status === "pending" ? '<button onclick="deleteLeg(' + l.id + ')" class="btn btn-sm btn-red">Delete</button>' : '') +
+            (l.status === "pending" ? '<button onclick="openDebate(' + l.id + ')" class="btn btn-sm btn-green">Open</button>' : '') +
+            (l.status === "pending" ? '<button onclick="deleteLeg(' + l.id + ')" class="btn btn-sm btn-red">Del</button>' : '') +
             (l.status === "pending" ? '<button onclick="moveLeg(' + l.id + ', -1)" class="btn btn-sm btn-gray">&#9650;</button><button onclick="moveLeg(' + l.id + ', 1)" class="btn btn-sm btn-gray">&#9660;</button>' : '') +
           '</div>' +
         '</div>';
@@ -413,13 +419,13 @@ function renderPODebatePanel(s) {
   if (!el) return;
 
   if (s.phase === "idle" || !s.active_legislation) {
-    el.innerHTML = '<p class="text-gray-500">No legislation is currently being debated. Open debate on a legislation item above.</p>';
+    el.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-sb-navy/10 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-sb-navy/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg></div><p class="text-gray-400">No legislation is currently being debated.<br>Open debate on a legislation item above.</p></div>';
     return;
   }
 
   var leg = s.active_legislation;
   var side = s.next_side ? "Affirmative" : "Negative";
-  var sideColor = s.next_side ? "text-green-700" : "text-red-700";
+  var sideColor = s.next_side ? "text-green-700" : "text-sb-red";
 
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
@@ -428,11 +434,11 @@ function renderPODebatePanel(s) {
   // History
   var historyHtml = "";
   if (s.speeches.length) {
-    historyHtml = '<h4 class="font-semibold text-sm mt-3 mb-1">Speech History</h4><ol class="list-decimal ml-5 text-sm">';
+    historyHtml = '<h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mt-4 mb-2">Speech History</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
     for (var i = 0; i < s.speeches.length; i++) {
       var sp = s.speeches[i];
-      var tag = sp.is_affirmative ? "AFF" : "NEG";
-      historyHtml += '<li>' + sp.full_name + ' (' + sp.school + ') &mdash; ' + tag + ' [' + sp.speech_type + ']</li>';
+      var tag = sp.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      historyHtml += '<li class="text-gray-600">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
     }
     historyHtml += '</ol>';
   }
@@ -442,34 +448,35 @@ function renderPODebatePanel(s) {
   if (s.phase === "speech_in_progress" && s.current_speech) {
     var cs = s.current_speech;
     var ctag = cs.is_affirmative ? "AFF" : "NEG";
+    var ctagColor = cs.is_affirmative ? "text-green-700" : "text-sb-red";
     currentHtml =
-      '<div class="card bg-yellow-50 border-yellow-300 p-3 mb-3">' +
-        '<h4 class="font-bold">Currently Speaking</h4>' +
-        '<p class="text-lg">' + cs.full_name + ' (' + cs.school + ') &mdash; ' + ctag + ' [' + cs.speech_type + ']</p>' +
-        '<button onclick="completeSpeech()" class="btn btn-blue mt-2">Speech Done &rarr; Questioning</button>' +
+      '<div class="card phase-card-speaking p-4 mb-3">' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Currently Speaking</h4></div>' +
+        '<p class="text-lg font-semibold">' + cs.full_name + ' <span class="text-gray-400 font-normal">(' + cs.school + ')</span> &mdash; <span class="' + ctagColor + ' font-bold">' + ctag + '</span> <span class="text-gray-400">[' + cs.speech_type + ']</span></p>' +
+        '<button onclick="completeSpeech()" class="btn btn-primary mt-3">Speech Done &rarr; Questioning</button>' +
       '</div>';
   } else if (s.phase === "questioning" && s.current_speech) {
     var cs2 = s.current_speech;
     currentHtml =
-      '<div class="card bg-blue-50 border-blue-300 p-3 mb-3">' +
-        '<h4 class="font-bold">Questioning: ' + cs2.full_name + '</h4>';
+      '<div class="card phase-card-question p-4 mb-3">' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-navy rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Questioning: ' + cs2.full_name + '</h4></div>';
     if (s.question_queue.length) {
-      currentHtml += '<ul class="text-sm mt-2">';
+      currentHtml += '<ul class="text-sm mt-2 space-y-1">';
       for (var j = 0; j < s.question_queue.length; j++) {
         var q = s.question_queue[j];
         if (q.status === "asking") {
-          currentHtml += '<li><strong>' + q.full_name + ' (' + q.school + ')</strong> &mdash; asking now ' +
-            '<button onclick="doneQuestion(' + q.id + ')" class="btn btn-sm btn-gray ml-1">Done</button></li>';
+          currentHtml += '<li class="flex items-center gap-2"><span class="badge badge-yellow">ASKING</span><strong>' + q.full_name + '</strong> (' + q.school + ') ' +
+            '<button onclick="doneQuestion(' + q.id + ')" class="btn btn-sm btn-gray ml-auto">Done</button></li>';
         } else {
-          currentHtml += '<li>' + q.full_name + ' (' + q.school + ') ' +
-            '<button onclick="selectQuestioner(' + q.id + ')" class="btn btn-sm btn-blue ml-1">Select</button></li>';
+          currentHtml += '<li class="flex items-center gap-2">' + q.full_name + ' <span class="text-gray-400">(' + q.school + ')</span> ' +
+            '<button onclick="selectQuestioner(' + q.id + ')" class="btn btn-sm btn-primary ml-auto">Select</button></li>';
         }
       }
       currentHtml += '</ul>';
     } else {
-      currentHtml += '<p class="text-sm text-gray-500 mt-1">No questioners yet.</p>';
+      currentHtml += '<p class="text-sm text-gray-400 mt-1">No questioners yet.</p>';
     }
-    currentHtml += '<button onclick="endQuestioning()" class="btn btn-gray mt-2">End Questioning &rarr; Next Speech</button></div>';
+    currentHtml += '<button onclick="endQuestioning()" class="btn btn-gray mt-3">End Questioning &rarr; Next Speech</button></div>';
   }
 
   // Speech queue with recommendation
@@ -484,35 +491,36 @@ function renderPODebatePanel(s) {
           break;
         }
       }
-      queueHtml = '<h4 class="font-semibold text-sm mb-1">Speech Queue <span class="text-xs text-gray-400">(sorted by precedence/recency)</span></h4>';
-      queueHtml += '<div class="space-y-1">';
+      queueHtml = '<h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mb-2">Speech Queue <span class="font-normal normal-case text-gray-400">(sorted by precedence)</span></h4>';
+      queueHtml += '<div class="space-y-2">';
       for (var m = 0; m < s.speech_queue.length; m++) {
         var sq = s.speech_queue[m];
-        var sqtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-red-700 font-bold">NEG</span>';
+        var sqtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
         var rec = sq.id === recommendedId ? '<span class="badge badge-yellow">RECOMMENDED</span>' : "";
+        var recClass = sq.id === recommendedId ? 'phase-card-speaking' : '';
         queueHtml +=
-          '<div class="card p-2 flex items-center justify-between ' + (sq.id === recommendedId ? 'bg-yellow-50 border-yellow-300' : '') + '">' +
-            '<span>' + sq.full_name + ' (' + sq.school + ') &mdash; ' + sqtag + ' [speeches: ' + sq.total_speeches + '] ' + rec + '</span>' +
+          '<div class="card p-3 flex items-center justify-between ' + recClass + '">' +
+            '<span class="text-sm">' + sq.full_name + ' <span class="text-gray-400">(' + sq.school + ')</span> &mdash; ' + sqtag + ' <span class="text-gray-400">[' + sq.total_speeches + ' speeches]</span> ' + rec + '</span>' +
             '<button onclick="selectSpeaker(' + sq.id + ')" class="btn btn-sm btn-green">Select</button>' +
           '</div>';
       }
       queueHtml += '</div>';
     } else {
-      queueHtml = '<p class="text-sm text-gray-500">No speakers in queue. Waiting for speakers to raise their hands...</p>';
+      queueHtml = '<p class="text-sm text-gray-400">No speakers in queue. Waiting for speakers to raise their hands...</p>';
     }
   }
 
   el.innerHTML =
-    '<div class="card p-4 mb-3">' +
+    '<div class="card p-5 mb-4 border-l-4" style="border-left-color:var(--sb-navy)">' +
       '<div class="flex justify-between items-start">' +
         '<div>' +
-          '<h3 class="text-lg font-bold">' + leg.title + '</h3>' +
-          '<p class="text-sm text-gray-500">' + leg.school + '</p>' +
-          (leg.body ? '<p class="text-sm mt-1">' + leg.body + '</p>' : '') +
+          '<h3 class="text-lg font-extrabold text-sb-navy">' + leg.title + '</h3>' +
+          '<p class="text-sm text-gray-400">' + leg.school + '</p>' +
+          (leg.body ? '<p class="text-sm text-gray-600 mt-1">' + leg.body + '</p>' : '') +
         '</div>' +
-        '<button onclick="closeDebate()" class="btn btn-sm btn-red">Close Debate</button>' +
+        '<button onclick="closeDebate()" class="btn btn-sm btn-red uppercase tracking-wide">Close Debate</button>' +
       '</div>' +
-      '<p class="mt-2 font-semibold">Next: <span class="' + sideColor + '">' + side + '</span> ' + speechLabel + '</p>' +
+      '<p class="mt-3 font-semibold text-sm">Next: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
     '</div>' +
     currentHtml +
     queueHtml +

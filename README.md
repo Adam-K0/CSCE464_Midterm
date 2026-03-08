@@ -1,5 +1,5 @@
-# Presiding Officer Helper
-See NSDA Congressional Debate Guidelines
+# Session Buddy
+A Presiding Officer helper for congressional debate sessions.
 
 
 ## Stack
