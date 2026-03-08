@@ -1,767 +1,579 @@
+/* ===== Congressional Debate — Client JS ===== */
+
 // ---------------------------------------------------------------------------
-// Utility helpers
+// Utility
 // ---------------------------------------------------------------------------
 
-/**
- * Fetch JSON from an API endpoint. Throws on non-OK responses.
- */
-async function getJSON(url, opts = {}) {
-  const res = await fetch(url, opts);
-  const data = await res.json();
+function toast(msg, type) {
+  type = type || "info";
+  var el = document.getElementById("toast");
+  if (!el) return;
+  el.textContent = msg;
+  el.className = "toast toast-" + type;
+  el.classList.remove("hidden");
+  clearTimeout(toast._t);
+  toast._t = setTimeout(function() { el.classList.add("hidden"); }, 3000);
+}
+
+async function api(url, opts) {
+  opts = opts || {};
+  opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
+  if (opts.body && typeof opts.body === "object") opts.body = JSON.stringify(opts.body);
+  var res = await fetch(url, opts);
+  var data = await res.json();
   if (!res.ok) throw new Error(data.error || "Request failed");
   return data;
 }
 
-/**
- * Format cents as a dollar string, e.g. 6999 → "$69.99"
- */
-function formatPrice(cents) {
-  return "$" + (cents / 100).toFixed(2);
-}
-
-/**
- * Format an ISO date string into a readable form.
- */
-function formatDate(iso) {
-  if (!iso) return "";
-  const d = new Date(iso);
-  return d.toLocaleDateString("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-    hour: "2-digit",
-    minute: "2-digit",
-  });
-}
-
-/**
- * Show a toast notification at the bottom-right of the screen.
- */
-function showToast(message, type = "success") {
-  const toast = document.getElementById("toast");
-  if (!toast) return;
-  toast.textContent = message;
-  toast.className = "toast " + type;
-  // Force reflow for re-triggering animation
-  void toast.offsetWidth;
-  clearTimeout(toast._timer);
-  toast._timer = setTimeout(() => {
-    toast.classList.add("hidden");
-  }, 2500);
-}
-
-/**
- * Escape HTML to prevent XSS when inserting user-visible text.
- */
-function escapeHTML(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-/**
- * Return a stock label object { text, className } based on quantity.
- */
-function stockInfo(stock) {
-  if (stock <= 0) return { text: "Out of stock", cls: "out" };
-  if (stock <= 5) return { text: `Only ${stock} left`, cls: "low" };
-  return { text: "In stock", cls: "" };
-}
-
-
 // ---------------------------------------------------------------------------
-// Cart badge (shown in navbar on every page)
+// Auth form handlers
 // ---------------------------------------------------------------------------
 
-async function refreshCartBadge() {
-  try {
-    const cart = await getJSON("/api/cart");
-    const el = document.getElementById("cartCount");
-    if (el) {
-      el.textContent = cart.count;
-      el.style.display = cart.count > 0 ? "" : "none";
-    }
-  } catch (_) {
-    // Silently ignore — badge is non-critical
-  }
-}
-
-
-// ---------------------------------------------------------------------------
-// Products page  (index.html)
-// ---------------------------------------------------------------------------
-
-let currentCategory = null; // null = "All"
-let currentPage = 1;
-let totalProducts = 0;
-const PRODUCTS_PER_PAGE = 12;
-
-/**
- * Render an array of product cards as HTML.
- */
-function renderProductCards(items) {
-  return items
-    .map((p) => {
-      const si = stockInfo(p.stock);
-      return `
-      <div class="card">
-        <a href="/product/${p.id}">
-          <img class="card-img" src="${escapeHTML(p.image_url || "https://picsum.photos/seed/placeholder/400/300")}" alt="${escapeHTML(p.name)}" loading="lazy">
-        </a>
-        <div class="card-body">
-          <div class="card-category">${escapeHTML(p.category || "")}</div>
-          <h3 class="card-title"><a href="/product/${p.id}">${escapeHTML(p.name)}</a></h3>
-          <p class="card-desc">${escapeHTML(p.description || "")}</p>
-          <div class="card-footer">
-            <div>
-              <span class="card-price">${formatPrice(p.price_cents)}</span>
-              <div class="stock-label ${si.cls}">${si.text}</div>
-            </div>
-            <button class="btn btn-primary btn-sm" data-add="${p.id}" ${p.stock <= 0 ? "disabled" : ""}>
-              ${p.stock <= 0 ? "Sold Out" : "Add to Cart"}
-            </button>
-          </div>
-        </div>
-      </div>`;
-    })
-    .join("");
-}
-
-/**
- * Update the visibility of the "Load more" button.
- */
-function updateLoadMoreBtn() {
-  const btn = document.getElementById("loadMoreBtn");
-  if (!btn) return;
-  const loaded = currentPage * PRODUCTS_PER_PAGE;
-  btn.style.display = loaded < totalProducts ? "" : "none";
-}
-
-/**
- * Load the first page of products (resets the grid).
- */
-async function loadProducts(category) {
-  const grid = document.getElementById("productGrid");
-  const loading = document.getElementById("loading");
-  if (!grid) return;
-
-  currentCategory = category || null;
-  currentPage = 1;
-
-  try {
-    const url = currentCategory
-      ? `/api/products?category=${encodeURIComponent(currentCategory)}&page=1&limit=${PRODUCTS_PER_PAGE}`
-      : `/api/products?page=1&limit=${PRODUCTS_PER_PAGE}`;
-    const data = await getJSON(url);
-
-    totalProducts = data.total;
-
-    // Render category filter buttons
-    renderCategoryFilter(data.categories);
-
-    // Hide loading spinner
-    if (loading) loading.classList.add("hidden");
-
-    // Render product cards
-    if (data.items.length === 0) {
-      grid.innerHTML = `<p class="text-center" style="grid-column:1/-1;color:var(--gray-500);">No products found.</p>`;
-      updateLoadMoreBtn();
-      return;
-    }
-
-    grid.innerHTML = renderProductCards(data.items);
-    updateLoadMoreBtn();
-  } catch (err) {
-    if (loading) loading.classList.add("hidden");
-    grid.innerHTML = `<p class="text-center" style="grid-column:1/-1;color:var(--danger);">Failed to load products.</p>`;
-  }
-}
-
-/**
- * Load the next page and append products to the grid.
- */
-async function loadMoreProducts() {
-  const grid = document.getElementById("productGrid");
-  const btn = document.getElementById("loadMoreBtn");
-  if (!grid || !btn) return;
-
-  currentPage++;
-  btn.disabled = true;
-  btn.textContent = "Loading...";
-
-  try {
-    let url = `/api/products?page=${currentPage}&limit=${PRODUCTS_PER_PAGE}`;
-    if (currentCategory) {
-      url += `&category=${encodeURIComponent(currentCategory)}`;
-    }
-    const data = await getJSON(url);
-    totalProducts = data.total;
-
-    // Append new cards to the grid
-    grid.insertAdjacentHTML("beforeend", renderProductCards(data.items));
-    updateLoadMoreBtn();
-  } catch (err) {
-    showToast("Failed to load more products", "error");
-    currentPage--; // revert so user can retry
-  } finally {
-    btn.disabled = false;
-    btn.textContent = "Load more...";
-  }
-}
-
-function renderCategoryFilter(categories) {
-  const container = document.getElementById("categoryFilter");
-  if (!container || !categories) return;
-
-  const allActive = !currentCategory ? "active" : "";
-  let html = `<button class="filter-btn ${allActive}" data-category="">All</button>`;
-  categories.forEach((cat) => {
-    const active = currentCategory === cat ? "active" : "";
-    html += `<button class="filter-btn ${active}" data-category="${escapeHTML(cat)}">${escapeHTML(cat)}</button>`;
-  });
-  container.innerHTML = html;
-}
-
-function setupProductGrid() {
-  const grid = document.getElementById("productGrid");
-  if (!grid) return;
-
-  // Add-to-cart click (event delegation)
-  grid.addEventListener("click", async (e) => {
-    const btn = e.target.closest("button[data-add]");
-    if (!btn || btn.disabled) return;
-
-    const productId = parseInt(btn.getAttribute("data-add"), 10);
-    btn.disabled = true;
-    btn.textContent = "Adding...";
-
-    try {
-      await getJSON("/api/cart/items", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ product_id: productId, quantity: 1 }),
-      });
-      showToast("Added to cart!");
-      await refreshCartBadge();
-    } catch (err) {
-      showToast(err.message, "error");
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Add to Cart";
-    }
-  });
-
-  // Category filter click
-  const filterContainer = document.getElementById("categoryFilter");
-  if (filterContainer) {
-    filterContainer.addEventListener("click", (e) => {
-      const btn = e.target.closest(".filter-btn");
-      if (!btn) return;
-      const category = btn.getAttribute("data-category");
-      loadProducts(category || null);
+function initAuthForms() {
+  var regForm = document.getElementById("registerForm");
+  if (regForm) {
+    regForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      try {
+        await api("/api/register", {
+          method: "POST",
+          body: {
+            name: document.getElementById("name").value,
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+            school: document.getElementById("school").value,
+          },
+        });
+        window.location.href = "/";
+      } catch (err) {
+        document.getElementById("authMsg").textContent = err.message;
+      }
     });
   }
 
-  // Load more button click
-  const loadMoreBtn = document.getElementById("loadMoreBtn");
-  if (loadMoreBtn) {
-    loadMoreBtn.addEventListener("click", loadMoreProducts);
-  }
-}
-
-
-// ---------------------------------------------------------------------------
-// Product Detail page  (product.html)
-// ---------------------------------------------------------------------------
-
-async function loadProductDetail() {
-  const container = document.getElementById("productDetail");
-  if (!container) return;
-
-  const productId = container.getAttribute("data-product-id");
-  if (!productId) return;
-
-  try {
-    const p = await getJSON(`/api/products/${productId}`);
-    const si = stockInfo(p.stock);
-
-    let stockClass = "in-stock";
-    if (p.stock <= 0) stockClass = "out-of-stock";
-    else if (p.stock <= 5) stockClass = "low-stock";
-
-    container.innerHTML = `
-      <img class="product-detail-img" src="${escapeHTML(p.image_url || "https://picsum.photos/seed/placeholder/400/300")}" alt="${escapeHTML(p.name)}">
-      <div class="product-detail-info">
-        <div class="product-detail-category">${escapeHTML(p.category || "")}</div>
-        <h2>${escapeHTML(p.name)}</h2>
-        <div class="product-detail-price">${formatPrice(p.price_cents)}</div>
-        <p class="product-detail-desc">${escapeHTML(p.description || "")}</p>
-        <div class="product-detail-stock ${stockClass}">${si.text}</div>
-        ${p.stock > 0 ? `
-        <div class="qty-selector">
-          <label for="detailQty">Quantity:</label>
-          <input id="detailQty" class="qty-input" type="number" min="1" max="${p.stock}" value="1">
-        </div>
-        <button id="detailAddBtn" class="btn btn-primary btn-lg">Add to Cart</button>
-        ` : `<button class="btn btn-primary btn-lg" disabled>Out of Stock</button>`}
-        <p id="detailMsg" class="mt-1" style="font-size:0.9rem;"></p>
-      </div>
-    `;
-
-    // Wire up add-to-cart on detail page
-    const addBtn = document.getElementById("detailAddBtn");
-    if (addBtn) {
-      addBtn.addEventListener("click", async () => {
-        const qty = parseInt(document.getElementById("detailQty").value, 10) || 1;
-        addBtn.disabled = true;
-        addBtn.textContent = "Adding...";
-        try {
-          await getJSON("/api/cart/items", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ product_id: parseInt(productId, 10), quantity: qty }),
-          });
-          showToast(`Added ${qty} item(s) to cart!`);
-          await refreshCartBadge();
-        } catch (err) {
-          showToast(err.message, "error");
-        } finally {
-          addBtn.disabled = false;
-          addBtn.textContent = "Add to Cart";
-        }
-      });
-    }
-  } catch (err) {
-    container.innerHTML = `<p style="color:var(--danger);">Product not found.</p>`;
-  }
-}
-
-
-// ---------------------------------------------------------------------------
-// Cart page  (cart.html)
-// ---------------------------------------------------------------------------
-
-async function loadCart() {
-  const box = document.getElementById("cartBox");
-  const summary = document.getElementById("cartSummary");
-  if (!box) return;
-
-  try {
-    const cart = await getJSON("/api/cart");
-
-    if (cart.items.length === 0) {
-      box.innerHTML = `
-        <div class="cart-empty">
-          <div class="cart-empty-icon">&#128722;</div>
-          <p>Your cart is empty.</p>
-          <a href="/" class="btn btn-primary mt-2">Continue Shopping</a>
-        </div>`;
-      if (summary) summary.classList.add("hidden");
-      return;
-    }
-
-    // Render cart items
-    box.innerHTML = cart.items
-      .map((i) => {
-        const subtotal = i.quantity * i.price_cents;
-        return `
-        <div class="cart-item">
-          <img class="cart-item-img" src="${escapeHTML(i.image_url || "https://picsum.photos/seed/placeholder/400/300")}" alt="${escapeHTML(i.name)}">
-          <div class="cart-item-info">
-            <div class="cart-item-name">${escapeHTML(i.name)}</div>
-            <div class="cart-item-price">${formatPrice(i.price_cents)} each</div>
-          </div>
-          <div class="cart-item-actions">
-            <div class="cart-qty-group">
-              <button class="cart-qty-btn" data-dec="${i.product_id}">&minus;</button>
-              <span class="cart-qty-value">${i.quantity}</span>
-              <button class="cart-qty-btn" data-inc="${i.product_id}" ${i.quantity >= i.stock ? "disabled" : ""}>&plus;</button>
-            </div>
-            <span class="cart-item-subtotal">${formatPrice(subtotal)}</span>
-            <button class="btn btn-danger btn-sm" data-remove="${i.product_id}">Remove</button>
-          </div>
-        </div>`;
-      })
-      .join("");
-
-    // Show summary
-    if (summary) {
-      summary.classList.remove("hidden");
-      document.getElementById("cartSubtotal").textContent = formatPrice(cart.total_cents);
-      document.getElementById("cartTotal").textContent = formatPrice(cart.total_cents);
-    }
-  } catch (err) {
-    box.innerHTML = `<p style="color:var(--danger);">Failed to load cart.</p>`;
-  }
-}
-
-function setupCartEvents() {
-  const box = document.getElementById("cartBox");
-  if (!box) return;
-
-  box.addEventListener("click", async (e) => {
-    // Increment
-    const incBtn = e.target.closest("button[data-inc]");
-    if (incBtn && !incBtn.disabled) {
-      const pid = parseInt(incBtn.getAttribute("data-inc"), 10);
-      const qtyEl = incBtn.parentElement.querySelector(".cart-qty-value");
-      const newQty = parseInt(qtyEl.textContent, 10) + 1;
+  var loginForm = document.getElementById("loginForm");
+  if (loginForm) {
+    loginForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
       try {
-        await getJSON(`/api/cart/items/${pid}`, {
-          method: "PATCH",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ quantity: newQty }),
+        await api("/api/login", {
+          method: "POST",
+          body: {
+            email: document.getElementById("email").value,
+            password: document.getElementById("password").value,
+          },
         });
-        await loadCart();
-        await refreshCartBadge();
+        window.location.href = "/";
       } catch (err) {
-        showToast(err.message, "error");
+        document.getElementById("authMsg").textContent = err.message;
       }
-      return;
-    }
+    });
+  }
 
-    // Decrement
-    const decBtn = e.target.closest("button[data-dec]");
-    if (decBtn) {
-      const pid = parseInt(decBtn.getAttribute("data-dec"), 10);
-      const qtyEl = decBtn.parentElement.querySelector(".cart-qty-value");
-      const currentQty = parseInt(qtyEl.textContent, 10);
-      if (currentQty <= 1) {
-        // Remove item if quantity would go below 1
-        try {
-          await getJSON(`/api/cart/items/${pid}`, { method: "DELETE" });
-          showToast("Item removed");
-          await loadCart();
-          await refreshCartBadge();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      } else {
-        try {
-          await getJSON(`/api/cart/items/${pid}`, {
-            method: "PATCH",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ quantity: currentQty - 1 }),
-          });
-          await loadCart();
-          await refreshCartBadge();
-        } catch (err) {
-          showToast(err.message, "error");
-        }
-      }
-      return;
-    }
-
-    // Remove
-    const removeBtn = e.target.closest("button[data-remove]");
-    if (removeBtn) {
-      const pid = parseInt(removeBtn.getAttribute("data-remove"), 10);
+  var poForm = document.getElementById("poLoginForm");
+  if (poForm) {
+    poForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
       try {
-        await getJSON(`/api/cart/items/${pid}`, { method: "DELETE" });
-        showToast("Item removed");
-        await loadCart();
-        await refreshCartBadge();
+        await api("/api/po/login", {
+          method: "POST",
+          body: { pin: document.getElementById("pin").value },
+        });
+        window.location.href = "/po";
       } catch (err) {
-        showToast(err.message, "error");
+        document.getElementById("authMsg").textContent = err.message;
       }
-    }
-  });
+    });
+  }
 }
 
-function setupCheckout() {
-  const btn = document.getElementById("checkoutBtn");
-  if (!btn) return;
+// ---------------------------------------------------------------------------
+// Logout
+// ---------------------------------------------------------------------------
 
-  btn.addEventListener("click", async () => {
-    const msg = document.getElementById("checkoutMsg");
-    btn.disabled = true;
-    btn.textContent = "Processing...";
-
-    try {
-      const data = await getJSON("/api/checkout", { method: "POST" });
-      msg.className = "checkout-msg success";
-      msg.innerHTML = `Order placed successfully! <a href="/order/${data.order_id}">View Order #${data.order_id}</a>`;
-      showToast("Order placed!");
-      await loadCart();
-      await refreshCartBadge();
-    } catch (err) {
-      if (err.message.includes("log in")) {
-        msg.className = "checkout-msg error";
-        msg.innerHTML = 'Please <a href="/login">log in</a> to checkout.';
-      } else {
-        msg.className = "checkout-msg error";
-        msg.textContent = err.message;
-      }
-      btn.disabled = false;
-      btn.textContent = "Proceed to Checkout";
-    }
-  });
+function initLogout() {
+  var btn = document.getElementById("logoutBtn");
+  if (btn) {
+    btn.addEventListener("click", async function(e) {
+      e.preventDefault();
+      await fetch("/api/logout", { method: "POST" });
+      window.location.href = "/login";
+    });
+  }
+  var poBtn = document.getElementById("poLogoutBtn");
+  if (poBtn) {
+    poBtn.addEventListener("click", async function(e) {
+      e.preventDefault();
+      await fetch("/api/po/logout", { method: "POST" });
+      window.location.href = "/";
+    });
+  }
 }
 
-
 // ---------------------------------------------------------------------------
-// Orders page  (orders.html)
+// Speaker dashboard (index.html)
 // ---------------------------------------------------------------------------
 
-async function loadOrders() {
-  const container = document.getElementById("ordersList");
-  if (!container) return;
+var pollTimer = null;
 
+function initSpeakerDashboard() {
+  var el = document.getElementById("speakerDashboard");
+  if (!el) return;
+  pollState();
+  pollTimer = setInterval(pollState, 2000);
+}
+
+async function pollState() {
   try {
-    const data = await getJSON("/api/orders");
+    var data = await api("/api/session/state");
+    renderSpeakerView(data);
+  } catch (e) {
+    // silently retry on next interval
+  }
+}
 
-    if (data.orders.length === 0) {
-      container.innerHTML = `
-        <div class="orders-empty">
-          <p>You have no orders yet.</p>
-          <a href="/" class="btn btn-primary mt-2">Start Shopping</a>
-        </div>`;
+function renderSpeakerView(s) {
+  var el = document.getElementById("speakerDashboard");
+  if (!el) return;
+
+  if (s.phase === "idle" || !s.active_legislation) {
+    el.innerHTML =
+      '<div class="card text-center p-8">' +
+        '<h2 class="text-xl font-semibold mb-2">Waiting for Debate</h2>' +
+        '<p class="text-gray-500">The Presiding Officer has not opened debate on any legislation yet.</p>' +
+      '</div>';
+    return;
+  }
+
+  var leg = s.active_legislation;
+  var side = s.next_side ? "Affirmative" : "Negative";
+  var sideColor = s.next_side ? "text-green-700" : "text-red-700";
+
+  var speechLabel = "";
+  if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
+  else if (s.speeches.length === 1) speechLabel = "(First Negative)";
+
+  // Speech history
+  var historyHtml = "";
+  if (s.speeches.length) {
+    historyHtml = '<div class="mb-4"><h3 class="font-semibold mb-1">Speeches Given</h3><ol class="list-decimal ml-5 text-sm">';
+    for (var i = 0; i < s.speeches.length; i++) {
+      var sp = s.speeches[i];
+      var tag = sp.is_affirmative ? '<span class="text-green-700">AFF</span>' : '<span class="text-red-700">NEG</span>';
+      historyHtml += '<li>' + sp.full_name + ' (' + sp.school + ') &mdash; ' + tag + ' [' + sp.speech_type + ']</li>';
+    }
+    historyHtml += '</ol></div>';
+  }
+
+  // Current speech / questioning
+  var currentHtml = "";
+  if (s.phase === "speech_in_progress" && s.current_speech) {
+    var cs = s.current_speech;
+    var ctag = cs.is_affirmative ? "AFF" : "NEG";
+    currentHtml =
+      '<div class="card bg-yellow-50 border-yellow-300 mb-4 p-4">' +
+        '<h3 class="font-semibold">Speech In Progress</h3>' +
+        '<p class="text-lg">' + cs.full_name + ' (' + cs.school + ') &mdash; ' + ctag + '</p>' +
+      '</div>';
+  } else if (s.phase === "questioning" && s.current_speech) {
+    var cs2 = s.current_speech;
+    currentHtml =
+      '<div class="card bg-blue-50 border-blue-300 mb-4 p-4">' +
+        '<h3 class="font-semibold">Questioning Period</h3>' +
+        '<p>Questions for: ' + cs2.full_name + ' (' + cs2.school + ')</p>' +
+        '<button onclick="requestToQuestion()" class="btn btn-blue mt-2">Raise Hand to Question</button>' +
+      '</div>';
+    if (s.question_queue.length) {
+      currentHtml += '<div class="mb-4"><h4 class="font-semibold text-sm">Question Queue</h4><ol class="list-decimal ml-5 text-sm">';
+      for (var j = 0; j < s.question_queue.length; j++) {
+        var q = s.question_queue[j];
+        var st = q.status === "asking" ? " <strong>(asking now)</strong>" : "";
+        currentHtml += '<li>' + q.full_name + ' (' + q.school + ')' + st + '</li>';
+      }
+      currentHtml += '</ol></div>';
+    }
+  }
+
+  // Speech queue
+  var queueHtml = "";
+  if (s.speech_queue.length) {
+    queueHtml = '<div class="mb-4"><h3 class="font-semibold mb-1">Speech Queue</h3><ol class="list-decimal ml-5 text-sm">';
+    for (var k = 0; k < s.speech_queue.length; k++) {
+      var sq = s.speech_queue[k];
+      var qtag = sq.is_affirmative ? '<span class="text-green-700">AFF</span>' : '<span class="text-red-700">NEG</span>';
+      queueHtml += '<li>' + sq.full_name + ' (' + sq.school + ') &mdash; ' + qtag + ' [speeches: ' + sq.total_speeches + ']</li>';
+    }
+    queueHtml += '</ol></div>';
+  }
+
+  // Request to speak buttons
+  var actionHtml = "";
+  if (s.phase === "speech_queue" || s.phase === "speech_in_progress") {
+    actionHtml =
+      '<div class="flex gap-2 mb-4">' +
+        '<button onclick="requestToSpeak(true)" class="btn btn-green">Speak Affirmative</button>' +
+        '<button onclick="requestToSpeak(false)" class="btn btn-red">Speak Negative</button>' +
+        '<button onclick="cancelSpeechRequest()" class="btn btn-gray">Cancel Request</button>' +
+      '</div>';
+  }
+
+  el.innerHTML =
+    '<div class="card mb-4 p-4">' +
+      '<h2 class="text-xl font-bold mb-1">' + leg.title + '</h2>' +
+      '<p class="text-sm text-gray-500 mb-2">Authored by: ' + leg.school + '</p>' +
+      (leg.body ? '<p class="text-sm mb-3">' + leg.body + '</p>' : '') +
+      '<p class="font-semibold">Next speech needed: <span class="' + sideColor + '">' + side + '</span> ' + speechLabel + '</p>' +
+    '</div>' +
+    currentHtml +
+    actionHtml +
+    queueHtml +
+    historyHtml;
+}
+
+async function requestToSpeak(isAff) {
+  try {
+    await api("/api/speech/request", { method: "POST", body: { is_affirmative: isAff } });
+    toast("Added to speech queue", "success");
+    pollState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function cancelSpeechRequest() {
+  try {
+    await api("/api/speech/cancel", { method: "POST" });
+    toast("Removed from queue", "success");
+    pollState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function requestToQuestion() {
+  try {
+    await api("/api/question/request", { method: "POST" });
+    toast("Added to question queue", "success");
+    pollState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+// ---------------------------------------------------------------------------
+// PO dashboard (po.html)
+// ---------------------------------------------------------------------------
+
+function initPODashboard() {
+  var el = document.getElementById("poDashboard");
+  if (!el) return;
+  loadLegislation();
+  pollPOState();
+  pollTimer = setInterval(pollPOState, 2000);
+
+  var addForm = document.getElementById("addLegForm");
+  if (addForm) {
+    addForm.addEventListener("submit", async function(e) {
+      e.preventDefault();
+      try {
+        await api("/api/legislation", {
+          method: "POST",
+          body: {
+            title: document.getElementById("legTitle").value,
+            school: document.getElementById("legSchool").value,
+            body: document.getElementById("legBody").value,
+          },
+        });
+        addForm.reset();
+        toast("Legislation added", "success");
+        loadLegislation();
+      } catch (err) {
+        toast(err.message, "error");
+      }
+    });
+  }
+}
+
+async function loadLegislation() {
+  var el = document.getElementById("legList");
+  if (!el) return;
+  try {
+    var data = await api("/api/legislation");
+    if (!data.legislation.length) {
+      el.innerHTML = '<p class="text-gray-500 text-sm">No legislation added yet.</p>';
       return;
     }
-
-    container.innerHTML = data.orders
-      .map((o) => {
-        return `
-        <div class="order-card">
-          <div class="order-card-header">
-            <span class="order-id">Order #${o.id}</span>
-            <span class="order-status ${o.status}">${escapeHTML(o.status)}</span>
-            ${o.return_status ? `<span class="return-badge ${o.return_status}">${escapeHTML(o.return_status.replace("_", " "))}</span>` : ""}
-          </div>
-          <div class="order-card-meta">
-            <span>${formatDate(o.created_at)}</span>
-            <span>${o.total_items} item(s)</span>
-          </div>
-          <div class="order-card-footer">
-            <span class="order-total">${formatPrice(o.total_cents)}</span>
-            <a href="/order/${o.id}" class="btn btn-sm">View Details</a>
-          </div>
-        </div>`;
-      })
-      .join("");
+    var html = "";
+    for (var i = 0; i < data.legislation.length; i++) {
+      var l = data.legislation[i];
+      var statusBadge = l.status === "completed"
+        ? '<span class="badge badge-gray">Done</span>'
+        : l.status === "active"
+        ? '<span class="badge badge-green">Active</span>'
+        : '<span class="badge badge-blue">Pending</span>';
+      html +=
+        '<div class="card p-3 mb-2 flex items-center justify-between">' +
+          '<div>' +
+            '<span class="font-semibold">' + l.leg_order + '.</span> ' + l.title +
+            ' <span class="text-xs text-gray-400">(' + l.school + ')</span> ' +
+            statusBadge +
+          '</div>' +
+          '<div class="flex gap-1">' +
+            (l.status === "pending" ? '<button onclick="openDebate(' + l.id + ')" class="btn btn-sm btn-green">Open Debate</button>' : '') +
+            (l.status === "pending" ? '<button onclick="deleteLeg(' + l.id + ')" class="btn btn-sm btn-red">Delete</button>' : '') +
+            (l.status === "pending" ? '<button onclick="moveLeg(' + l.id + ', -1)" class="btn btn-sm btn-gray">&#9650;</button><button onclick="moveLeg(' + l.id + ', 1)" class="btn btn-sm btn-gray">&#9660;</button>' : '') +
+          '</div>' +
+        '</div>';
+    }
+    el.innerHTML = html;
   } catch (err) {
-    container.innerHTML = `<p style="color:var(--danger);">Failed to load orders.</p>`;
+    el.innerHTML = '<p class="text-red-500">' + err.message + '</p>';
   }
 }
 
-
-// ---------------------------------------------------------------------------
-// Order Detail page  (order_detail.html)
-// ---------------------------------------------------------------------------
-
-async function loadOrderDetail() {
-  const container = document.getElementById("orderDetail");
-  if (!container) return;
-
-  const orderId = container.getAttribute("data-order-id");
-  if (!orderId) return;
-
+async function moveLeg(id, dir) {
   try {
-    const data = await getJSON(`/api/orders/${orderId}`);
-    const order = data.order;
-    const items = data.items;
-
-    container.innerHTML = `
-      <div class="order-detail-header">
-        <div>
-          <span class="order-status ${order.status}">${escapeHTML(order.status)}</span>
-        </div>
-        <div class="order-detail-date">${formatDate(order.created_at)}</div>
-      </div>
-      <div class="order-detail-items">
-        ${items
-          .map((i) => {
-            const subtotal = i.quantity * i.unit_price_cents;
-            return `
-            <div class="order-detail-item">
-              <img class="order-detail-item-img" src="${escapeHTML(i.image_url || "https://picsum.photos/seed/placeholder/400/300")}" alt="${escapeHTML(i.product_name)}">
-              <div class="order-detail-item-info">
-                <div class="order-detail-item-name">${escapeHTML(i.product_name)}</div>
-                <div class="order-detail-item-meta">${formatPrice(i.unit_price_cents)} x ${i.quantity}</div>
-              </div>
-              <div class="order-detail-item-subtotal">${formatPrice(subtotal)}</div>
-            </div>`;
-          })
-          .join("")}
-      </div>
-      <div class="order-detail-total">
-        Total: <span>${formatPrice(order.total_cents)}</span>
-      </div>
-      ${order.return_status
-        ? `<div class="return-badge ${order.return_status}" style="margin-top:1rem;">Return status: ${escapeHTML(order.return_status.replace("_", " "))}</div>`
-        : ""}
-      ${order.status === "confirmed" && !order.return_status
-        ? `<button id="returnBtn" class="btn btn-danger" style="margin-top:1rem;">Request Return</button>`
-        : ""}
-    `;
-
-    // Wire up return button
-    const returnBtn = document.getElementById("returnBtn");
-    if (returnBtn) {
-      returnBtn.addEventListener("click", async () => {
-        if (!confirm("Are you sure you want to request a return for this order?")) return;
-        returnBtn.disabled = true;
-        returnBtn.textContent = "Requesting...";
-        try {
-          await getJSON(`/api/orders/${orderId}/return`, { method: "POST" });
-          showToast("Return requested!");
-          await loadOrderDetail();
-        } catch (err) {
-          showToast(err.message, "error");
-          returnBtn.disabled = false;
-          returnBtn.textContent = "Request Return";
-        }
-      });
+    var data = await api("/api/legislation");
+    var legs = data.legislation;
+    var idx = -1;
+    for (var i = 0; i < legs.length; i++) {
+      if (legs[i].id === id) { idx = i; break; }
     }
+    if (idx < 0) return;
+    var newIdx = idx + dir;
+    if (newIdx < 0 || newIdx >= legs.length) return;
+    var tmp = legs[idx];
+    legs[idx] = legs[newIdx];
+    legs[newIdx] = tmp;
+    var order = [];
+    for (var j = 0; j < legs.length; j++) order.push(legs[j].id);
+    await api("/api/legislation/reorder", { method: "POST", body: { order: order } });
+    loadLegislation();
   } catch (err) {
-    container.innerHTML = `<p style="color:var(--danger);">Order not found.</p>`;
+    toast(err.message, "error");
   }
 }
 
+async function deleteLeg(id) {
+  if (!confirm("Delete this legislation?")) return;
+  try {
+    await api("/api/legislation/" + id, { method: "DELETE" });
+    toast("Deleted", "success");
+    loadLegislation();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
-// ---------------------------------------------------------------------------
-// Register page  (register.html)
-// ---------------------------------------------------------------------------
+async function openDebate(legId) {
+  try {
+    await api("/api/session/open-debate", { method: "POST", body: { legislation_id: legId } });
+    toast("Debate opened", "success");
+    loadLegislation();
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
-function setupRegister() {
-  const form = document.getElementById("registerForm");
-  if (!form) return;
+async function closeDebate() {
+  try {
+    await api("/api/session/close-debate", { method: "POST" });
+    toast("Debate closed", "success");
+    loadLegislation();
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById("authMsg");
-    const name = document.getElementById("name").value.trim();
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
+async function resetSession() {
+  if (!confirm("Reset the entire session? This clears all speeches and queues.")) return;
+  try {
+    await api("/api/session/reset", { method: "POST" });
+    toast("Session reset", "success");
+    loadLegislation();
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
-    try {
-      await getJSON("/api/register", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ name, email, password }),
-      });
-      window.location.href = "/";
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.className = "auth-msg error";
+async function pollPOState() {
+  try {
+    var data = await api("/api/session/state");
+    renderPODebatePanel(data);
+  } catch (e) {
+    // retry next interval
+  }
+}
+
+function renderPODebatePanel(s) {
+  var el = document.getElementById("debatePanel");
+  if (!el) return;
+
+  if (s.phase === "idle" || !s.active_legislation) {
+    el.innerHTML = '<p class="text-gray-500">No legislation is currently being debated. Open debate on a legislation item above.</p>';
+    return;
+  }
+
+  var leg = s.active_legislation;
+  var side = s.next_side ? "Affirmative" : "Negative";
+  var sideColor = s.next_side ? "text-green-700" : "text-red-700";
+
+  var speechLabel = "";
+  if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
+  else if (s.speeches.length === 1) speechLabel = "(First Negative)";
+
+  // History
+  var historyHtml = "";
+  if (s.speeches.length) {
+    historyHtml = '<h4 class="font-semibold text-sm mt-3 mb-1">Speech History</h4><ol class="list-decimal ml-5 text-sm">';
+    for (var i = 0; i < s.speeches.length; i++) {
+      var sp = s.speeches[i];
+      var tag = sp.is_affirmative ? "AFF" : "NEG";
+      historyHtml += '<li>' + sp.full_name + ' (' + sp.school + ') &mdash; ' + tag + ' [' + sp.speech_type + ']</li>';
     }
-  });
-}
+    historyHtml += '</ol>';
+  }
 
-
-// ---------------------------------------------------------------------------
-// Login page  (login.html)
-// ---------------------------------------------------------------------------
-
-function setupLogin() {
-  const form = document.getElementById("loginForm");
-  if (!form) return;
-
-  form.addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const msg = document.getElementById("authMsg");
-    const email = document.getElementById("email").value.trim();
-    const password = document.getElementById("password").value;
-
-    try {
-      await getJSON("/api/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-      window.location.href = "/";
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.className = "auth-msg error";
+  // Current speech
+  var currentHtml = "";
+  if (s.phase === "speech_in_progress" && s.current_speech) {
+    var cs = s.current_speech;
+    var ctag = cs.is_affirmative ? "AFF" : "NEG";
+    currentHtml =
+      '<div class="card bg-yellow-50 border-yellow-300 p-3 mb-3">' +
+        '<h4 class="font-bold">Currently Speaking</h4>' +
+        '<p class="text-lg">' + cs.full_name + ' (' + cs.school + ') &mdash; ' + ctag + ' [' + cs.speech_type + ']</p>' +
+        '<button onclick="completeSpeech()" class="btn btn-blue mt-2">Speech Done &rarr; Questioning</button>' +
+      '</div>';
+  } else if (s.phase === "questioning" && s.current_speech) {
+    var cs2 = s.current_speech;
+    currentHtml =
+      '<div class="card bg-blue-50 border-blue-300 p-3 mb-3">' +
+        '<h4 class="font-bold">Questioning: ' + cs2.full_name + '</h4>';
+    if (s.question_queue.length) {
+      currentHtml += '<ul class="text-sm mt-2">';
+      for (var j = 0; j < s.question_queue.length; j++) {
+        var q = s.question_queue[j];
+        if (q.status === "asking") {
+          currentHtml += '<li><strong>' + q.full_name + ' (' + q.school + ')</strong> &mdash; asking now ' +
+            '<button onclick="doneQuestion(' + q.id + ')" class="btn btn-sm btn-gray ml-1">Done</button></li>';
+        } else {
+          currentHtml += '<li>' + q.full_name + ' (' + q.school + ') ' +
+            '<button onclick="selectQuestioner(' + q.id + ')" class="btn btn-sm btn-blue ml-1">Select</button></li>';
+        }
+      }
+      currentHtml += '</ul>';
+    } else {
+      currentHtml += '<p class="text-sm text-gray-500 mt-1">No questioners yet.</p>';
     }
-  });
-}
+    currentHtml += '<button onclick="endQuestioning()" class="btn btn-gray mt-2">End Questioning &rarr; Next Speech</button></div>';
+  }
 
-
-// ---------------------------------------------------------------------------
-// Profile page  (profile.html)
-// ---------------------------------------------------------------------------
-
-function setupProfile() {
-  const btn = document.getElementById("deleteAccountBtn");
-  if (!btn) return;
-
-  btn.addEventListener("click", async () => {
-    const msg = document.getElementById("deleteMsg");
-    const password = prompt("To confirm, please enter your password:");
-    if (!password) return;
-
-    if (!confirm("Are you absolutely sure? This cannot be undone.")) return;
-
-    btn.disabled = true;
-    btn.textContent = "Deleting...";
-
-    try {
-      await getJSON("/api/delete-account", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ password }),
-      });
-      showToast("Account deleted");
-      window.location.href = "/";
-    } catch (err) {
-      msg.textContent = err.message;
-      msg.className = "auth-msg error";
-      btn.disabled = false;
-      btn.textContent = "Delete My Account";
+  // Speech queue with recommendation
+  var queueHtml = "";
+  if (s.phase === "speech_queue") {
+    if (s.speech_queue.length) {
+      // Find recommended: first person whose side matches next_side
+      var recommendedId = null;
+      for (var k = 0; k < s.speech_queue.length; k++) {
+        if (s.speech_queue[k].is_affirmative === s.next_side) {
+          recommendedId = s.speech_queue[k].id;
+          break;
+        }
+      }
+      queueHtml = '<h4 class="font-semibold text-sm mb-1">Speech Queue <span class="text-xs text-gray-400">(sorted by precedence/recency)</span></h4>';
+      queueHtml += '<div class="space-y-1">';
+      for (var m = 0; m < s.speech_queue.length; m++) {
+        var sq = s.speech_queue[m];
+        var sqtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-red-700 font-bold">NEG</span>';
+        var rec = sq.id === recommendedId ? '<span class="badge badge-yellow">RECOMMENDED</span>' : "";
+        queueHtml +=
+          '<div class="card p-2 flex items-center justify-between ' + (sq.id === recommendedId ? 'bg-yellow-50 border-yellow-300' : '') + '">' +
+            '<span>' + sq.full_name + ' (' + sq.school + ') &mdash; ' + sqtag + ' [speeches: ' + sq.total_speeches + '] ' + rec + '</span>' +
+            '<button onclick="selectSpeaker(' + sq.id + ')" class="btn btn-sm btn-green">Select</button>' +
+          '</div>';
+      }
+      queueHtml += '</div>';
+    } else {
+      queueHtml = '<p class="text-sm text-gray-500">No speakers in queue. Waiting for speakers to raise their hands...</p>';
     }
-  });
+  }
+
+  el.innerHTML =
+    '<div class="card p-4 mb-3">' +
+      '<div class="flex justify-between items-start">' +
+        '<div>' +
+          '<h3 class="text-lg font-bold">' + leg.title + '</h3>' +
+          '<p class="text-sm text-gray-500">' + leg.school + '</p>' +
+          (leg.body ? '<p class="text-sm mt-1">' + leg.body + '</p>' : '') +
+        '</div>' +
+        '<button onclick="closeDebate()" class="btn btn-sm btn-red">Close Debate</button>' +
+      '</div>' +
+      '<p class="mt-2 font-semibold">Next: <span class="' + sideColor + '">' + side + '</span> ' + speechLabel + '</p>' +
+    '</div>' +
+    currentHtml +
+    queueHtml +
+    historyHtml;
 }
 
+async function selectSpeaker(queueId) {
+  try {
+    await api("/api/speech/select/" + queueId, { method: "POST" });
+    toast("Speaker selected", "success");
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function completeSpeech() {
+  try {
+    await api("/api/speech/complete", { method: "POST" });
+    toast("Moved to questioning", "success");
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function endQuestioning() {
+  try {
+    await api("/api/speech/end-questioning", { method: "POST" });
+    toast("Ready for next speech", "success");
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function selectQuestioner(queueId) {
+  try {
+    await api("/api/question/select/" + queueId, { method: "POST" });
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
+
+async function doneQuestion(queueId) {
+  try {
+    await api("/api/question/done/" + queueId, { method: "POST" });
+    pollPOState();
+  } catch (err) {
+    toast(err.message, "error");
+  }
+}
 
 // ---------------------------------------------------------------------------
-// Initialization — runs on every page
+// Init
 // ---------------------------------------------------------------------------
 
-document.addEventListener("DOMContentLoaded", async () => {
-  // Always update the cart badge in the navbar
-  await refreshCartBadge();
-
-  // Products page
-  if (document.getElementById("productGrid")) {
-    await loadProducts();
-    setupProductGrid();
-  }
-
-  // Product detail page
-  if (document.getElementById("productDetail")) {
-    await loadProductDetail();
-  }
-
-  // Cart page
-  if (document.getElementById("cartBox")) {
-    await loadCart();
-    setupCartEvents();
-    setupCheckout();
-  }
-
-  // Orders page
-  if (document.getElementById("ordersList")) {
-    await loadOrders();
-  }
-
-  // Order detail page
-  if (document.getElementById("orderDetail")) {
-    await loadOrderDetail();
-  }
-
-  // Register page
-  if (document.getElementById("registerForm")) {
-    setupRegister();
-  }
-
-  // Login page
-  if (document.getElementById("loginForm")) {
-    setupLogin();
-  }
-
-  // Profile page
-  if (document.getElementById("deleteAccountBtn")) {
-    setupProfile();
-  }
+document.addEventListener("DOMContentLoaded", function() {
+  initAuthForms();
+  initLogout();
+  initSpeakerDashboard();
+  initPODashboard();
 });

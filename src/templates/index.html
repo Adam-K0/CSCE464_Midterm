@@ -1,26 +1,17 @@
 {% extends "base.html" %}
+{% block title %}Dashboard — Congressional Debate{% endblock %}
 {% block content %}
-
-<section class="page-header">
-  <h1>Our Products</h1>
-  <p class="subtitle">Browse our collection of premium tech accessories</p>
-</section>
-
-<!-- Category filter buttons (populated by JS) -->
-<div id="categoryFilter" class="category-filter"></div>
-
-<!-- Product grid (populated by JS) -->
-<div id="productGrid" class="grid"></div>
-
-<!-- Loading indicator -->
-<div id="loading" class="loading">
-  <div class="spinner"></div>
-  <p>Loading products...</p>
-</div>
-
-<!-- Load more area -->
-<div class="load-more-area">
-  <button id="loadMoreBtn" class="btn btn-primary" style="display:none;">Load more...</button>
-</div>
-
+{% if current_user %}
+  <h1 class="text-2xl font-bold mb-4">Speaker Dashboard</h1>
+  <div id="speakerDashboard">
+    <p class="text-gray-500">Loading debate state...</p>
+  </div>
+{% else %}
+  <div class="card p-8 text-center">
+    <h1 class="text-2xl font-bold mb-2">NSDA Congressional Debate</h1>
+    <p class="text-gray-500 mb-4">Track speeches, precedence, and questioning in real time.</p>
+    <a href="/login" class="btn btn-blue">Login</a>
+    <a href="/register" class="btn btn-green ml-2">Register</a>
+  </div>
+{% endif %}
 {% endblock %}

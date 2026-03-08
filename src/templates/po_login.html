@@ -1,0 +1,15 @@
+{% extends "base.html" %}
+{% block title %}PO Login — Congressional Debate{% endblock %}
+{% block content %}
+<div class="max-w-sm mx-auto card p-6">
+  <h1 class="text-xl font-bold mb-4">Presiding Officer Login</h1>
+  <form id="poLoginForm" class="space-y-3">
+    <div>
+      <label class="block text-sm font-medium mb-1">PO PIN</label>
+      <input type="password" id="pin" class="form-input" required placeholder="Enter PIN">
+    </div>
+    <div id="authMsg" class="auth-msg"></div>
+    <button type="submit" class="btn btn-green w-full">Enter as PO</button>
+  </form>
+</div>
+{% endblock %}

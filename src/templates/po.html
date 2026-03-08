@@ -1,0 +1,35 @@
+{% extends "base.html" %}
+{% block title %}PO Dashboard — Congressional Debate{% endblock %}
+{% block content %}
+<div id="poDashboard">
+  <h1 class="text-2xl font-bold mb-4">Presiding Officer Dashboard</h1>
+
+  <!-- Add legislation -->
+  <div class="card p-4 mb-4">
+    <h2 class="text-lg font-semibold mb-2">Add Legislation</h2>
+    <form id="addLegForm" class="space-y-2">
+      <input type="text" id="legTitle" class="form-input" placeholder="Title / Bill Number" required>
+      <input type="text" id="legSchool" class="form-input" placeholder="Authoring School" required>
+      <textarea id="legBody" class="form-input" placeholder="Description (optional)"></textarea>
+      <button type="submit" class="btn btn-green">Add to Docket</button>
+    </form>
+  </div>
+
+  <!-- Legislation list -->
+  <div class="card p-4 mb-4">
+    <h2 class="text-lg font-semibold mb-2">Docket</h2>
+    <div id="legList"><p class="text-gray-500 text-sm">Loading...</p></div>
+  </div>
+
+  <!-- Debate panel -->
+  <div class="card p-4 mb-4">
+    <h2 class="text-lg font-semibold mb-2">Debate</h2>
+    <div id="debatePanel"><p class="text-gray-500">No active debate.</p></div>
+  </div>
+
+  <!-- Session controls -->
+  <div class="text-right">
+    <button onclick="resetSession()" class="btn btn-red btn-sm">Reset Entire Session</button>
+  </div>
+</div>
+{% endblock %}

@@ -1,61 +1,46 @@
-<!doctype html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>{{ title or "eShop" }}</title>
-  <link rel="stylesheet" href="/static/style.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}Congressional Debate{% endblock %}</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
-<body>
+<body class="bg-gray-100 min-h-screen flex flex-col">
 
-  <!-- ===== Navbar ===== -->
-  <header class="navbar">
-    <div class="navbar-inner">
-      <a href="/" class="brand">
-        <span class="brand-icon">&#128722;</span> eShop
-      </a>
-      <nav class="nav-links">
-        <a href="/" class="nav-link">Products</a>
-        <a href="/cart" class="nav-link cart-link">
-          <span class="cart-icon">&#128722;</span>
-          Cart
-          <span id="cartCount" class="badge">0</span>
-        </a>
+  <!-- Nav -->
+  <nav class="bg-white shadow">
+    <div class="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
+      <a href="/" class="text-lg font-bold text-blue-700">Congress</a>
+      <div class="flex items-center gap-3 text-sm">
         {% if current_user %}
-          <a href="/orders" class="nav-link">Orders</a>
-          <a href="/profile" class="nav-user">Hi, {{ current_user.name }}</a>
-          <a href="#" class="nav-link" id="logoutBtn">Logout</a>
+          <span class="text-gray-600">{{ current_user.name }}</span>
+          <a href="#" id="logoutBtn" class="text-red-600 hover:underline">Logout</a>
         {% else %}
-          <a href="/login" class="nav-link">Login</a>
-          <a href="/register" class="nav-link">Register</a>
+          <a href="/login" class="text-blue-600 hover:underline">Login</a>
+          <a href="/register" class="text-blue-600 hover:underline">Register</a>
         {% endif %}
-      </nav>
+        {% if is_po %}
+          <a href="/po" class="text-green-700 font-semibold hover:underline">PO Dashboard</a>
+          <a href="#" id="poLogoutBtn" class="text-red-600 hover:underline text-xs">(PO Logout)</a>
+        {% else %}
+          <a href="/po/login" class="text-gray-400 hover:underline text-xs">PO</a>
+        {% endif %}
+      </div>
     </div>
-  </header>
+  </nav>
 
-  <!-- ===== Toast notification ===== -->
+  <!-- Toast -->
   <div id="toast" class="toast hidden"></div>
 
-  <!-- ===== Main content ===== -->
-  <main class="container">
+  <!-- Main content -->
+  <main class="flex-1 max-w-4xl mx-auto w-full px-4 py-6">
     {% block content %}{% endblock %}
   </main>
 
-  <!-- ===== Footer ===== -->
-  <footer class="footer">
-    <p>&copy; 2026 eShop &mdash; Course Demo Project</p>
-  </footer>
+  <footer class="text-center text-xs text-gray-400 py-4">NSDA Congressional Debate Tracker</footer>
 
-  <script src="/static/app.js"></script>
-  <script>
-    const logoutBtn = document.getElementById("logoutBtn");
-    if (logoutBtn) {
-      logoutBtn.addEventListener("click", async (e) => {
-        e.preventDefault();
-        await fetch("/api/logout", { method: "POST" });
-        window.location.href = "/";
-      });
-    }
-  </script>
+  <script src="{{ url_for('static', filename='app.js') }}"></script>
 </body>
 </html>

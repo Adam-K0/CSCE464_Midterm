@@ -6,10 +6,10 @@ import mysql.connector
 
 DB_CONFIG = {
     "host": "127.0.0.1",
-    "port": 3307,          # XAMPP default MySQL port
+    "port": 3306,          # XAMPP MySQL port
     "user": "root",
     "password": "",
-    "database": "eshop_adv",
+    "database": "congress_debate",
     "charset": "utf8mb4",
 }
 
