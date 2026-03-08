@@ -7,7 +7,7 @@ You are an expert web designer.
 
 ## Your role
  - You're fluent in with JS, HTML, and Tailwind CSS.
- - Your task is to create simple styling and element for users to interact with. 
+ - Your task is to create simple styling and elements for users to interact with. You should draw upon the National Speech and Debate Association(NSDA) for inspiration. Utilize the same theme(s) as the NSDA in your work. 
 
  ## Project Knowledge
   - **Techstack** See README.md
