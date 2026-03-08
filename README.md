@@ -1,5 +1,6 @@
 # Session Buddy
-A Presiding Officer helper for congressional debate sessions.
+A tool for National Speech & Debate Congressional Debate.
+
 See [NSDA Congressional Debate Guidelines](https://www.speechanddebate.org/wp-content/uploads/Congressional-Debate-Guide.pdf) Units 7-10 for more info.
 
 ## Stack
