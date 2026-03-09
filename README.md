@@ -12,4 +12,4 @@ See [NSDA Congressional Debate Guidelines](https://www.speechanddebate.org/wp-co
 ## Deployment
 - Ngrok link
 
-[For Lee](https://unenlivened-wailfully-shannon.ngrok-free.dev/)
+(https://unenlivened-wailfully-shannon.ngrok-free.dev/)
