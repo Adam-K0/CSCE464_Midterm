@@ -166,8 +166,8 @@ function renderSpeakerView(s) {
   if (s.phase === "idle" || !s.active_legislation) {
     el.innerHTML =
       '<div class="card text-center p-10">' +
-        '<div class="w-16 h-16 bg-sb-navy/10 rounded-full flex items-center justify-center mx-auto mb-4">' +
-          '<svg class="w-8 h-8 text-sb-navy/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
+        '<div class="w-16 h-16 bg-sb-navy/10 dark:bg-sb-gold/10 rounded-full flex items-center justify-center mx-auto mb-4">' +
+          '<svg class="w-8 h-8 text-sb-navy/40 dark:text-sb-gold/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>' +
         '</div>' +
         '<h2 class="text-xl font-bold section-title mb-2">Waiting for Debate</h2>' +
         '<p class="text-gray-400">The Presiding Officer has not opened debate on any legislation yet.</p>' +
@@ -177,7 +177,7 @@ function renderSpeakerView(s) {
 
   var leg = s.active_legislation;
   var side = s.next_side ? "Affirmative" : "Negative";
-  var sideColor = s.next_side ? "text-green-700" : "text-sb-red";
+  var sideColor = s.next_side ? "text-green-700 dark:text-green-400" : "text-sb-red";
 
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
@@ -186,11 +186,11 @@ function renderSpeakerView(s) {
   // Speech history
   var historyHtml = "";
   if (s.speeches.length) {
-    historyHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-2 text-sm uppercase tracking-wide">Speech History</h3><ol class="list-decimal ml-5 text-sm space-y-1">';
+    historyHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy dark:text-sb-gold mb-2 text-sm uppercase tracking-wide">Speech History</h3><ol class="list-decimal ml-5 text-sm space-y-1">';
     for (var i = 0; i < s.speeches.length; i++) {
       var sp = s.speeches[i];
-      var tag = sp.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
-      historyHtml += '<li class="text-gray-600">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
+      var tag = sp.is_affirmative ? '<span class="text-green-700 dark:text-green-400 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      historyHtml += '<li class="text-gray-600 dark:text-gray-300">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
     }
     historyHtml += '</ol></div>';
   }
@@ -200,26 +200,26 @@ function renderSpeakerView(s) {
   if (s.phase === "speech_in_progress" && s.current_speech) {
     var cs = s.current_speech;
     var ctag = cs.is_affirmative ? "AFF" : "NEG";
-    var ctagColor = cs.is_affirmative ? "text-green-700" : "text-sb-red";
+    var ctagColor = cs.is_affirmative ? "text-green-700 dark:text-green-400" : "text-sb-red";
     currentHtml =
       '<div class="card phase-card-speaking mb-4 p-5">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Speech In Progress</h3></div>' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Speech In Progress</h3></div>' +
         '<p class="text-lg font-semibold">' + cs.full_name + ' <span class="text-gray-400 font-normal">(' + cs.school + ')</span> &mdash; <span class="' + ctagColor + ' font-bold">' + ctag + '</span></p>' +
       '</div>';
   } else if (s.phase === "questioning" && s.current_speech) {
     var cs2 = s.current_speech;
     currentHtml =
       '<div class="card phase-card-question mb-4 p-5">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-navy rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Questioning Period</h3></div>' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold dark:bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning Period</h3></div>' +
         '<p class="mb-3">Questions for: <strong>' + cs2.full_name + '</strong> (' + cs2.school + ')</p>' +
         '<button onclick="requestToQuestion()" class="btn btn-primary">Raise Hand to Question</button>' +
       '</div>';
     if (s.question_queue.length) {
-      currentHtml += '<div class="card p-4 mb-4"><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mb-2">Question Queue</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
+      currentHtml += '<div class="card p-4 mb-4"><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide mb-2">Question Queue</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
       for (var j = 0; j < s.question_queue.length; j++) {
         var q = s.question_queue[j];
         var st = q.status === "asking" ? ' <span class="badge badge-yellow">ASKING NOW</span>' : "";
-        currentHtml += '<li class="text-gray-600">' + q.full_name + ' <span class="text-gray-400">(' + q.school + ')</span>' + st + '</li>';
+        currentHtml += '<li class="text-gray-600 dark:text-gray-300">' + q.full_name + ' <span class="text-gray-400">(' + q.school + ')</span>' + st + '</li>';
       }
       currentHtml += '</ol></div>';
     }
@@ -228,11 +228,11 @@ function renderSpeakerView(s) {
   // Speech queue
   var queueHtml = "";
   if (s.speech_queue.length) {
-    queueHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-2 text-sm uppercase tracking-wide">Speech Queue</h3><div class="space-y-1">';
+    queueHtml = '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy dark:text-sb-gold mb-2 text-sm uppercase tracking-wide">Speech Queue</h3><div class="space-y-1">';
     for (var k = 0; k < s.speech_queue.length; k++) {
       var sq = s.speech_queue[k];
-      var qtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
-      queueHtml += '<div class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 text-sm"><span class="text-gray-400 font-mono text-xs">' + (k+1) + '.</span> ' + sq.full_name + ' <span class="text-gray-400">(' + sq.school + ')</span> &mdash; ' + qtag + ' <span class="text-gray-400">[' + sq.total_speeches + ' speeches]</span></div>';
+      var qtag = sq.is_affirmative ? '<span class="text-green-700 dark:text-green-400 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      queueHtml += '<div class="flex items-center gap-2 py-1.5 px-2 rounded hover:bg-gray-50 dark:hover:bg-white/5 text-sm"><span class="text-gray-400 font-mono text-xs">' + (k+1) + '.</span> ' + sq.full_name + ' <span class="text-gray-400">(' + sq.school + ')</span> &mdash; ' + qtag + ' <span class="text-gray-400">[' + sq.total_speeches + ' speeches]</span></div>';
     }
     queueHtml += '</div></div>';
   }
@@ -241,7 +241,7 @@ function renderSpeakerView(s) {
   var actionHtml = "";
   if (s.phase === "speech_queue" || s.phase === "speech_in_progress") {
     actionHtml =
-      '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy mb-3 text-sm uppercase tracking-wide">Raise Your Hand</h3><div class="flex flex-wrap gap-2">' +
+      '<div class="card p-4 mb-4"><h3 class="font-bold text-sb-navy dark:text-sb-gold mb-3 text-sm uppercase tracking-wide">Raise Your Hand</h3><div class="flex flex-wrap gap-2">' +
         '<button onclick="requestToSpeak(true)" class="btn btn-green">&#9757; Speak Affirmative</button>' +
         '<button onclick="requestToSpeak(false)" class="btn btn-red">&#9757; Speak Negative</button>' +
         '<button onclick="cancelSpeechRequest()" class="btn btn-gray">Cancel Request</button>' +
@@ -250,9 +250,9 @@ function renderSpeakerView(s) {
 
   el.innerHTML =
     '<div class="card mb-4 p-5 border-l-4" style="border-left-color:var(--sb-navy)">' +
-      '<h2 class="text-xl font-extrabold text-sb-navy mb-1">' + leg.title + '</h2>' +
+      '<h2 class="text-xl font-extrabold text-sb-navy dark:text-sb-gold mb-1">' + leg.title + '</h2>' +
       '<p class="text-sm text-gray-400 mb-2">Authored by: ' + leg.school + '</p>' +
-      (leg.body ? '<p class="text-sm text-gray-600 mb-3">' + leg.body + '</p>' : '') +
+      (leg.body ? '<p class="text-sm text-gray-600 dark:text-gray-300 mb-3">' + leg.body + '</p>' : '') +
       '<p class="font-semibold text-sm">Next speech needed: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
     '</div>' +
     currentHtml +
@@ -346,7 +346,7 @@ async function loadLegislation() {
       html +=
         '<div class="card p-3 mb-2 flex items-center justify-between border-l-4" style="' + borderColor + '">' +
           '<div>' +
-            '<span class="font-bold text-sb-navy">' + l.leg_order + '.</span> ' +
+            '<span class="font-bold text-sb-navy dark:text-sb-gold">' + l.leg_order + '.</span> ' +
             '<span class="font-semibold">' + l.title + '</span>' +
             ' <span class="text-xs text-gray-400">(' + l.school + ')</span> ' +
             statusBadge +
@@ -446,13 +446,13 @@ function renderPODebatePanel(s) {
   if (!el) return;
 
   if (s.phase === "idle" || !s.active_legislation) {
-    el.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-sb-navy/10 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-sb-navy/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg></div><p class="text-gray-400">No legislation is currently being debated.<br>Open debate on a legislation item above.</p></div>';
+    el.innerHTML = '<div class="text-center py-8"><div class="w-12 h-12 bg-sb-navy/10 dark:bg-sb-gold/10 rounded-full flex items-center justify-center mx-auto mb-3"><svg class="w-6 h-6 text-sb-navy/40 dark:text-sb-gold/40" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="1.5"><path stroke-linecap="round" stroke-linejoin="round" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg></div><p class="text-gray-400">No legislation is currently being debated.<br>Open debate on a legislation item above.</p></div>';
     return;
   }
 
   var leg = s.active_legislation;
   var side = s.next_side ? "Affirmative" : "Negative";
-  var sideColor = s.next_side ? "text-green-700" : "text-sb-red";
+  var sideColor = s.next_side ? "text-green-700 dark:text-green-400" : "text-sb-red";
 
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
@@ -461,11 +461,11 @@ function renderPODebatePanel(s) {
   // History
   var historyHtml = "";
   if (s.speeches.length) {
-    historyHtml = '<h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mt-4 mb-2">Speech History</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
+    historyHtml = '<h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide mt-4 mb-2">Speech History</h4><ol class="list-decimal ml-5 text-sm space-y-1">';
     for (var i = 0; i < s.speeches.length; i++) {
       var sp = s.speeches[i];
-      var tag = sp.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
-      historyHtml += '<li class="text-gray-600">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
+      var tag = sp.is_affirmative ? '<span class="text-green-700 dark:text-green-400 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+      historyHtml += '<li class="text-gray-600 dark:text-gray-300">' + sp.full_name + ' <span class="text-gray-400">(' + sp.school + ')</span> &mdash; ' + tag + ' <span class="text-gray-400">[' + sp.speech_type + ']</span></li>';
     }
     historyHtml += '</ol>';
   }
@@ -475,10 +475,10 @@ function renderPODebatePanel(s) {
   if (s.phase === "speech_in_progress" && s.current_speech) {
     var cs = s.current_speech;
     var ctag = cs.is_affirmative ? "AFF" : "NEG";
-    var ctagColor = cs.is_affirmative ? "text-green-700" : "text-sb-red";
+    var ctagColor = cs.is_affirmative ? "text-green-700 dark:text-green-400" : "text-sb-red";
     currentHtml =
       '<div class="card phase-card-speaking p-4 mb-3">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Currently Speaking</h4></div>' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Currently Speaking</h4></div>' +
         '<p class="text-lg font-semibold">' + cs.full_name + ' <span class="text-gray-400 font-normal">(' + cs.school + ')</span> &mdash; <span class="' + ctagColor + ' font-bold">' + ctag + '</span> <span class="text-gray-400">[' + cs.speech_type + ']</span></p>' +
         '<button onclick="completeSpeech()" class="btn btn-primary mt-3">Speech Done &rarr; Questioning</button>' +
       '</div>';
@@ -486,7 +486,7 @@ function renderPODebatePanel(s) {
     var cs2 = s.current_speech;
     currentHtml =
       '<div class="card phase-card-question p-4 mb-3">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-navy rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide">Questioning: ' + cs2.full_name + '</h4></div>';
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold dark:bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning: ' + cs2.full_name + '</h4></div>';
     if (s.question_queue.length) {
       currentHtml += '<ul class="text-sm mt-2 space-y-1">';
       for (var j = 0; j < s.question_queue.length; j++) {
@@ -518,11 +518,11 @@ function renderPODebatePanel(s) {
           break;
         }
       }
-      queueHtml = '<h4 class="font-bold text-sb-navy text-sm uppercase tracking-wide mb-2">Speech Queue <span class="font-normal normal-case text-gray-400">(sorted by precedence)</span></h4>';
+      queueHtml = '<h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide mb-2">Speech Queue <span class="font-normal normal-case text-gray-400">(sorted by precedence)</span></h4>';
       queueHtml += '<div class="space-y-2">';
       for (var m = 0; m < s.speech_queue.length; m++) {
         var sq = s.speech_queue[m];
-        var sqtag = sq.is_affirmative ? '<span class="text-green-700 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
+        var sqtag = sq.is_affirmative ? '<span class="text-green-700 dark:text-green-400 font-bold">AFF</span>' : '<span class="text-sb-red font-bold">NEG</span>';
         var rec = sq.id === recommendedId ? '<span class="badge badge-yellow">RECOMMENDED</span>' : "";
         var recClass = sq.id === recommendedId ? 'phase-card-speaking' : '';
         queueHtml +=
@@ -541,9 +541,9 @@ function renderPODebatePanel(s) {
     '<div class="card p-5 mb-4 border-l-4" style="border-left-color:var(--sb-navy)">' +
       '<div class="flex justify-between items-start">' +
         '<div>' +
-          '<h3 class="text-lg font-extrabold text-sb-navy">' + leg.title + '</h3>' +
+          '<h3 class="text-lg font-extrabold text-sb-navy dark:text-sb-gold">' + leg.title + '</h3>' +
           '<p class="text-sm text-gray-400">' + leg.school + '</p>' +
-          (leg.body ? '<p class="text-sm text-gray-600 mt-1">' + leg.body + '</p>' : '') +
+          (leg.body ? '<p class="text-sm text-gray-600 dark:text-gray-300 mt-1">' + leg.body + '</p>' : '') +
         '</div>' +
         '<button onclick="closeDebate()" class="btn btn-sm btn-red uppercase tracking-wide">Close Debate</button>' +
       '</div>' +
