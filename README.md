@@ -11,5 +11,3 @@ See [NSDA Congressional Debate Guidelines](https://www.speechanddebate.org/wp-co
 
 ## Deployment
 - Ngrok link
-
-(https://unenlivened-wailfully-shannon.ngrok-free.dev/)
