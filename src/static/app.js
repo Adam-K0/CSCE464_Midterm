@@ -31,17 +31,6 @@ function updateDarkToggleIcons(isDark) {
 // Utility
 // ---------------------------------------------------------------------------
 
-function toast(msg, type) {
-  type = type || "info";
-  var el = document.getElementById("toast");
-  if (!el) return;
-  el.textContent = msg;
-  el.className = "toast toast-" + type;
-  el.classList.remove("hidden");
-  clearTimeout(toast._t);
-  toast._t = setTimeout(function() { el.classList.add("hidden"); }, 3000);
-}
-
 async function api(url, opts) {
   opts = opts || {};
   opts.headers = Object.assign({ "Content-Type": "application/json" }, opts.headers || {});
@@ -264,31 +253,22 @@ function renderSpeakerView(s) {
 async function requestToSpeak(isAff) {
   try {
     await api("/api/speech/request", { method: "POST", body: { is_affirmative: isAff } });
-    toast("Added to speech queue", "success");
     pollState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function cancelSpeechRequest() {
   try {
     await api("/api/speech/cancel", { method: "POST" });
-    toast("Removed from queue", "success");
     pollState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function requestToQuestion() {
   try {
     await api("/api/question/request", { method: "POST" });
-    toast("Added to question queue", "success");
     pollState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 // ---------------------------------------------------------------------------
@@ -316,11 +296,8 @@ function initPODashboard() {
           },
         });
         addForm.reset();
-        toast("Legislation added", "success");
         loadLegislation();
-      } catch (err) {
-        toast(err.message, "error");
-      }
+      } catch (err) { /* ignored */ }
     });
   }
 }
@@ -382,54 +359,40 @@ async function moveLeg(id, dir) {
     for (var j = 0; j < legs.length; j++) order.push(legs[j].id);
     await api("/api/legislation/reorder", { method: "POST", body: { order: order } });
     loadLegislation();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function deleteLeg(id) {
   if (!confirm("Delete this legislation?")) return;
   try {
     await api("/api/legislation/" + id, { method: "DELETE" });
-    toast("Deleted", "success");
     loadLegislation();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function openDebate(legId) {
   try {
     await api("/api/session/open-debate", { method: "POST", body: { legislation_id: legId } });
-    toast("Debate opened", "success");
     loadLegislation();
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function closeDebate() {
   try {
     await api("/api/session/close-debate", { method: "POST" });
-    toast("Debate closed", "success");
     loadLegislation();
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function resetSession() {
   if (!confirm("Reset the entire session? This clears all speeches and queues.")) return;
   try {
     await api("/api/session/reset", { method: "POST" });
-    toast("Session reset", "success");
     loadLegislation();
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function pollPOState() {
@@ -557,49 +520,36 @@ function renderPODebatePanel(s) {
 async function selectSpeaker(queueId) {
   try {
     await api("/api/speech/select/" + queueId, { method: "POST" });
-    toast("Speaker selected", "success");
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function completeSpeech() {
   try {
     await api("/api/speech/complete", { method: "POST" });
-    toast("Moved to questioning", "success");
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function endQuestioning() {
   try {
     await api("/api/speech/end-questioning", { method: "POST" });
-    toast("Ready for next speech", "success");
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function selectQuestioner(queueId) {
   try {
     await api("/api/question/select/" + queueId, { method: "POST" });
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 async function doneQuestion(queueId) {
   try {
     await api("/api/question/done/" + queueId, { method: "POST" });
     pollPOState();
-  } catch (err) {
-    toast(err.message, "error");
-  }
+  } catch (err) { /* ignored */ }
 }
 
 // ---------------------------------------------------------------------------
