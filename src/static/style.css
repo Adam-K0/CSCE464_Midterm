@@ -45,24 +45,6 @@ body {
   color: var(--sb-gray-800);
 }
 
-/* --- Toast notifications --- */
-.toast {
-  position: fixed;
-  top: 1rem;
-  right: 1rem;
-  padding: 0.75rem 1.25rem;
-  border-radius: var(--sb-radius);
-  color: #fff;
-  font-size: 0.875rem;
-  z-index: 9999;
-  transition: opacity 0.3s, transform 0.3s;
-  box-shadow: var(--sb-shadow-md);
-}
-.toast.hidden { opacity: 0; pointer-events: none; transform: translateY(-0.5rem); }
-.toast-success { background: #16a34a; }
-.toast-error   { background: var(--sb-red); }
-.toast-info    { background: var(--sb-navy); }
-
 /* --- Card --- */
 .card {
   background: var(--sb-white);

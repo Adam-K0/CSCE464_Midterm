@@ -1,7 +1,7 @@
 from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
-from db import get_conn
+from db import get_db
 import secrets
 
 app = Flask(__name__)
@@ -102,27 +102,24 @@ def api_register():
     if len(password) < 6:
         return jsonify({"error": "Password must be at least 6 characters"}), 400
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT id FROM speakers WHERE email = %s", (email,))
-    if cur.fetchone():
-        cur.close(); conn.close()
-        return jsonify({"error": "Email already registered"}), 409
+    with get_db() as (conn, cur):
+        cur.execute("SELECT id FROM speakers WHERE email = %s", (email,))
+        if cur.fetchone():
+            return jsonify({"error": "Email already registered"}), 409
 
-    pw_hash = generate_password_hash(password)
-    cur.execute(
-        "INSERT INTO speakers (email, password_hash, full_name, school) VALUES (%s, %s, %s, %s)",
-        (email, pw_hash, name, school),
-    )
-    conn.commit()
-    uid = cur.lastrowid
+        pw_hash = generate_password_hash(password)
+        cur.execute(
+            "INSERT INTO speakers (email, password_hash, full_name, school) VALUES (%s, %s, %s, %s)",
+            (email, pw_hash, name, school),
+        )
+        conn.commit()
+        uid = cur.lastrowid
 
-    session["user_id"] = uid
-    session["user_name"] = name
-    session["user_email"] = email
-    session["user_school"] = school
+        session["user_id"] = uid
+        session["user_name"] = name
+        session["user_email"] = email
+        session["user_school"] = school
 
-    cur.close(); conn.close()
     return jsonify({"ok": True}), 201
 
 
@@ -132,14 +129,12 @@ def api_login():
     email = (data.get("email") or "").strip().lower()
     password = data.get("password") or ""
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute(
-        "SELECT id, email, full_name, school, password_hash FROM speakers WHERE email = %s",
-        (email,),
-    )
-    user = cur.fetchone()
-    cur.close(); conn.close()
+    with get_db() as (conn, cur):
+        cur.execute(
+            "SELECT id, email, full_name, school, password_hash FROM speakers WHERE email = %s",
+            (email,),
+        )
+        user = cur.fetchone()
 
     if not user or not check_password_hash(user["password_hash"], password):
         return jsonify({"error": "Invalid email or password"}), 401
@@ -179,11 +174,9 @@ def api_po_logout():
 
 @app.get("/api/legislation")
 def api_legislation_list():
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation ORDER BY leg_order")
-    rows = cur.fetchall()
-    cur.close(); conn.close()
+    with get_db() as (conn, cur):
+        cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation ORDER BY leg_order")
+        rows = cur.fetchall()
     return jsonify({"legislation": rows})
 
 
@@ -200,17 +193,15 @@ def api_legislation_create():
     if not title or not school:
         return jsonify({"error": "Title and school are required"}), 400
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT COALESCE(MAX(leg_order), 0) + 1 AS next_order FROM legislation")
-    next_order = cur.fetchone()["next_order"]
-    cur.execute(
-        "INSERT INTO legislation (school, title, body, leg_order) VALUES (%s, %s, %s, %s)",
-        (school, title, body, next_order),
-    )
-    conn.commit()
-    lid = cur.lastrowid
-    cur.close(); conn.close()
+    with get_db() as (conn, cur):
+        cur.execute("SELECT COALESCE(MAX(leg_order), 0) + 1 AS next_order FROM legislation")
+        next_order = cur.fetchone()["next_order"]
+        cur.execute(
+            "INSERT INTO legislation (school, title, body, leg_order) VALUES (%s, %s, %s, %s)",
+            (school, title, body, next_order),
+        )
+        conn.commit()
+        lid = cur.lastrowid
     return jsonify({"ok": True, "id": lid}), 201
 
 
@@ -221,20 +212,17 @@ def api_legislation_update(leg_id):
         return err
     data = request.get_json(silent=True) or {}
 
-    conn = get_conn()
-    cur = conn.cursor()
     fields, values = [], []
     for col in ("title", "school", "body"):
         if col in data:
             fields.append(f"{col} = %s")
             values.append(data[col])
     if not fields:
-        conn.close()
         return jsonify({"error": "No fields to update"}), 400
     values.append(leg_id)
-    cur.execute(f"UPDATE legislation SET {', '.join(fields)} WHERE id = %s", values)
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute(f"UPDATE legislation SET {', '.join(fields)} WHERE id = %s", values)
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -243,11 +231,9 @@ def api_legislation_delete(leg_id):
     err = po_api_guard()
     if err:
         return err
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM legislation WHERE id = %s", (leg_id,))
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute("DELETE FROM legislation WHERE id = %s", (leg_id,))
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -259,12 +245,10 @@ def api_legislation_reorder():
     data = request.get_json(silent=True) or {}
     order = data.get("order", [])
 
-    conn = get_conn()
-    cur = conn.cursor()
-    for i, lid in enumerate(order, 1):
-        cur.execute("UPDATE legislation SET leg_order = %s WHERE id = %s", (i, int(lid)))
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        for i, lid in enumerate(order, 1):
+            cur.execute("UPDATE legislation SET leg_order = %s WHERE id = %s", (i, int(lid)))
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -278,97 +262,93 @@ def _iso(dt):
 
 @app.get("/api/session/state")
 def api_session_state():
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
+    with get_db() as (conn, cur):
+        cur.execute("SELECT * FROM session_state WHERE id = 1")
+        state = cur.fetchone()
 
-    cur.execute("SELECT * FROM session_state WHERE id = 1")
-    state = cur.fetchone()
+        result = {
+            "phase": state["phase"] if state else "idle",
+            "active_legislation": None,
+            "current_speech": None,
+            "speeches": [],
+            "speech_queue": [],
+            "question_queue": [],
+            "next_side": None,
+        }
 
-    result = {
-        "phase": state["phase"] if state else "idle",
-        "active_legislation": None,
-        "current_speech": None,
-        "speeches": [],
-        "speech_queue": [],
-        "question_queue": [],
-        "next_side": None,
-    }
+        if not state or not state["active_legislation_id"]:
+            return jsonify(result)
 
-    if not state or not state["active_legislation_id"]:
-        cur.close(); conn.close()
-        return jsonify(result)
+        leg_id = state["active_legislation_id"]
 
-    leg_id = state["active_legislation_id"]
+        # Active legislation
+        cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation WHERE id = %s", (leg_id,))
+        result["active_legislation"] = cur.fetchone()
 
-    # Active legislation
-    cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation WHERE id = %s", (leg_id,))
-    result["active_legislation"] = cur.fetchone()
-
-    # Speeches on this legislation
-    cur.execute("""
-        SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
-               s.speech_type, s.created_at, sp.full_name, sp.school
-        FROM speeches s JOIN speakers sp ON sp.id = s.speaker_id
-        WHERE s.legislation_id = %s ORDER BY s.created_at
-    """, (leg_id,))
-    speeches = cur.fetchall()
-    for r in speeches:
-        r["created_at"] = _iso(r["created_at"])
-    result["speeches"] = speeches
-
-    # Determine next side needed
-    if len(speeches) == 0:
-        result["next_side"] = True   # authorship — affirmative
-    elif len(speeches) == 1:
-        result["next_side"] = False  # first negative
-    else:
-        result["next_side"] = not speeches[-1]["is_affirmative"]
-
-    # Speech queue with precedence/recency info
-    cur.execute("""
-        SELECT sq.id, sq.legislation_id, sq.speaker_id, sq.is_affirmative,
-               sq.status, sq.created_at,
-               sp.full_name, sp.school,
-               (SELECT COUNT(*) FROM speeches WHERE speaker_id = sq.speaker_id) AS total_speeches,
-               (SELECT MAX(created_at) FROM speeches WHERE speaker_id = sq.speaker_id) AS last_speech_time
-        FROM speech_queue sq
-        JOIN speakers sp ON sp.id = sq.speaker_id
-        WHERE sq.legislation_id = %s AND sq.status = 'waiting'
-        ORDER BY total_speeches ASC, last_speech_time ASC, sq.created_at ASC
-    """, (leg_id,))
-    queue = cur.fetchall()
-    for r in queue:
-        r["created_at"] = _iso(r["created_at"])
-        r["last_speech_time"] = _iso(r["last_speech_time"])
-    result["speech_queue"] = queue
-
-    # Current speech & question queue
-    if state["current_speech_id"]:
+        # Speeches on this legislation
         cur.execute("""
             SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
                    s.speech_type, s.created_at, sp.full_name, sp.school
             FROM speeches s JOIN speakers sp ON sp.id = s.speaker_id
-            WHERE s.id = %s
-        """, (state["current_speech_id"],))
-        cs = cur.fetchone()
-        if cs:
-            cs["created_at"] = _iso(cs["created_at"])
-        result["current_speech"] = cs
-
-        cur.execute("""
-            SELECT qq.id, qq.speech_id, qq.speaker_id, qq.status, qq.created_at,
-                   sp.full_name, sp.school
-            FROM question_queue qq
-            JOIN speakers sp ON sp.id = qq.speaker_id
-            WHERE qq.speech_id = %s AND qq.status IN ('waiting', 'asking')
-            ORDER BY qq.created_at ASC
-        """, (state["current_speech_id"],))
-        qqueue = cur.fetchall()
-        for r in qqueue:
+            WHERE s.legislation_id = %s ORDER BY s.created_at
+        """, (leg_id,))
+        speeches = cur.fetchall()
+        for r in speeches:
             r["created_at"] = _iso(r["created_at"])
-        result["question_queue"] = qqueue
+        result["speeches"] = speeches
 
-    cur.close(); conn.close()
+        # Determine next side needed
+        if len(speeches) == 0:
+            result["next_side"] = True   # authorship — affirmative
+        elif len(speeches) == 1:
+            result["next_side"] = False  # first negative
+        else:
+            result["next_side"] = not speeches[-1]["is_affirmative"]
+
+        # Speech queue with precedence/recency info
+        cur.execute("""
+            SELECT sq.id, sq.legislation_id, sq.speaker_id, sq.is_affirmative,
+                   sq.status, sq.created_at,
+                   sp.full_name, sp.school,
+                   (SELECT COUNT(*) FROM speeches WHERE speaker_id = sq.speaker_id) AS total_speeches,
+                   (SELECT MAX(created_at) FROM speeches WHERE speaker_id = sq.speaker_id) AS last_speech_time
+            FROM speech_queue sq
+            JOIN speakers sp ON sp.id = sq.speaker_id
+            WHERE sq.legislation_id = %s AND sq.status = 'waiting'
+            ORDER BY total_speeches ASC, last_speech_time ASC, sq.created_at ASC
+        """, (leg_id,))
+        queue = cur.fetchall()
+        for r in queue:
+            r["created_at"] = _iso(r["created_at"])
+            r["last_speech_time"] = _iso(r["last_speech_time"])
+        result["speech_queue"] = queue
+
+        # Current speech & question queue
+        if state["current_speech_id"]:
+            cur.execute("""
+                SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
+                       s.speech_type, s.created_at, sp.full_name, sp.school
+                FROM speeches s JOIN speakers sp ON sp.id = s.speaker_id
+                WHERE s.id = %s
+            """, (state["current_speech_id"],))
+            cs = cur.fetchone()
+            if cs:
+                cs["created_at"] = _iso(cs["created_at"])
+            result["current_speech"] = cs
+
+            cur.execute("""
+                SELECT qq.id, qq.speech_id, qq.speaker_id, qq.status, qq.created_at,
+                       sp.full_name, sp.school
+                FROM question_queue qq
+                JOIN speakers sp ON sp.id = qq.speaker_id
+                WHERE qq.speech_id = %s AND qq.status IN ('waiting', 'asking')
+                ORDER BY qq.created_at ASC
+            """, (state["current_speech_id"],))
+            qqueue = cur.fetchall()
+            for r in qqueue:
+                r["created_at"] = _iso(r["created_at"])
+            result["question_queue"] = qqueue
+
     return jsonify(result)
 
 
@@ -382,15 +362,13 @@ def api_session_open_debate():
     if not leg_id:
         return jsonify({"error": "legislation_id required"}), 400
 
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE session_state SET active_legislation_id = %s, current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1",
-        (leg_id,),
-    )
-    cur.execute("UPDATE legislation SET status = 'active' WHERE id = %s", (leg_id,))
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute(
+            "UPDATE session_state SET active_legislation_id = %s, current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1",
+            (leg_id,),
+        )
+        cur.execute("UPDATE legislation SET status = 'active' WHERE id = %s", (leg_id,))
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -400,20 +378,18 @@ def api_session_close_debate():
     if err:
         return err
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT active_legislation_id FROM session_state WHERE id = 1")
-    state = cur.fetchone()
+    with get_db() as (conn, cur):
+        cur.execute("SELECT active_legislation_id FROM session_state WHERE id = 1")
+        state = cur.fetchone()
 
-    if state and state["active_legislation_id"]:
-        lid = state["active_legislation_id"]
-        cur.execute("UPDATE legislation SET status = 'completed' WHERE id = %s", (lid,))
-        cur.execute("UPDATE speech_queue SET status = 'cancelled' WHERE legislation_id = %s AND status = 'waiting'", (lid,))
-    cur.execute(
-        "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1"
-    )
-    conn.commit()
-    cur.close(); conn.close()
+        if state and state["active_legislation_id"]:
+            lid = state["active_legislation_id"]
+            cur.execute("UPDATE legislation SET status = 'completed' WHERE id = %s", (lid,))
+            cur.execute("UPDATE speech_queue SET status = 'cancelled' WHERE legislation_id = %s AND status = 'waiting'", (lid,))
+        cur.execute(
+            "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1"
+        )
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -423,15 +399,13 @@ def api_session_reset():
     err = po_api_guard()
     if err:
         return err
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("DELETE FROM question_queue")
-    cur.execute("DELETE FROM speech_queue")
-    cur.execute("DELETE FROM speeches")
-    cur.execute("UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1")
-    cur.execute("UPDATE legislation SET status = 'pending'")
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute("DELETE FROM question_queue")
+        cur.execute("DELETE FROM speech_queue")
+        cur.execute("DELETE FROM speeches")
+        cur.execute("UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1")
+        cur.execute("UPDATE legislation SET status = 'pending'")
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -450,33 +424,28 @@ def api_speech_request():
     if is_aff is None:
         return jsonify({"error": "is_affirmative required"}), 400
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
+    with get_db() as (conn, cur):
+        cur.execute("SELECT active_legislation_id, phase FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state["active_legislation_id"]:
+            return jsonify({"error": "No active legislation"}), 400
 
-    cur.execute("SELECT active_legislation_id, phase FROM session_state WHERE id = 1")
-    state = cur.fetchone()
-    if not state or not state["active_legislation_id"]:
-        cur.close(); conn.close()
-        return jsonify({"error": "No active legislation"}), 400
+        leg_id = state["active_legislation_id"]
 
-    leg_id = state["active_legislation_id"]
+        # Already in queue?
+        cur.execute(
+            "SELECT id FROM speech_queue WHERE legislation_id = %s AND speaker_id = %s AND status = 'waiting'",
+            (leg_id, uid),
+        )
+        if cur.fetchone():
+            return jsonify({"error": "Already in queue"}), 400
 
-    # Already in queue?
-    cur.execute(
-        "SELECT id FROM speech_queue WHERE legislation_id = %s AND speaker_id = %s AND status = 'waiting'",
-        (leg_id, uid),
-    )
-    if cur.fetchone():
-        cur.close(); conn.close()
-        return jsonify({"error": "Already in queue"}), 400
-
-    cur.execute(
-        "INSERT INTO speech_queue (legislation_id, speaker_id, is_affirmative) VALUES (%s, %s, %s)",
-        (leg_id, uid, bool(is_aff)),
-    )
-    conn.commit()
-    qid = cur.lastrowid
-    cur.close(); conn.close()
+        cur.execute(
+            "INSERT INTO speech_queue (legislation_id, speaker_id, is_affirmative) VALUES (%s, %s, %s)",
+            (leg_id, uid, bool(is_aff)),
+        )
+        conn.commit()
+        qid = cur.lastrowid
     return jsonify({"ok": True, "queue_id": qid}), 201
 
 
@@ -486,14 +455,12 @@ def api_speech_cancel():
     if not uid:
         return jsonify({"error": "Login required"}), 401
 
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute(
-        "UPDATE speech_queue SET status = 'cancelled' WHERE speaker_id = %s AND status = 'waiting'",
-        (uid,),
-    )
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute(
+            "UPDATE speech_queue SET status = 'cancelled' WHERE speaker_id = %s AND status = 'waiting'",
+            (uid,),
+        )
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -503,37 +470,33 @@ def api_speech_select(queue_id):
     if err:
         return err
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
+    with get_db() as (conn, cur):
+        cur.execute("SELECT * FROM speech_queue WHERE id = %s AND status = 'waiting'", (queue_id,))
+        entry = cur.fetchone()
+        if not entry:
+            return jsonify({"error": "Queue entry not found"}), 404
 
-    cur.execute("SELECT * FROM speech_queue WHERE id = %s AND status = 'waiting'", (queue_id,))
-    entry = cur.fetchone()
-    if not entry:
-        cur.close(); conn.close()
-        return jsonify({"error": "Queue entry not found"}), 404
+        # Determine speech type
+        cur.execute("SELECT COUNT(*) AS cnt FROM speeches WHERE legislation_id = %s", (entry["legislation_id"],))
+        cnt = cur.fetchone()["cnt"]
+        if cnt == 0:
+            stype = "authorship"
+        elif cnt == 1:
+            stype = "first_negative"
+        else:
+            stype = "regular"
 
-    # Determine speech type
-    cur.execute("SELECT COUNT(*) AS cnt FROM speeches WHERE legislation_id = %s", (entry["legislation_id"],))
-    cnt = cur.fetchone()["cnt"]
-    if cnt == 0:
-        stype = "authorship"
-    elif cnt == 1:
-        stype = "first_negative"
-    else:
-        stype = "regular"
-
-    cur.execute(
-        "INSERT INTO speeches (legislation_id, speaker_id, is_affirmative, speech_type) VALUES (%s, %s, %s, %s)",
-        (entry["legislation_id"], entry["speaker_id"], entry["is_affirmative"], stype),
-    )
-    speech_id = cur.lastrowid
-    cur.execute("UPDATE speech_queue SET status = 'speaking' WHERE id = %s", (queue_id,))
-    cur.execute(
-        "UPDATE session_state SET current_speech_id = %s, phase = 'speech_in_progress' WHERE id = 1",
-        (speech_id,),
-    )
-    conn.commit()
-    cur.close(); conn.close()
+        cur.execute(
+            "INSERT INTO speeches (legislation_id, speaker_id, is_affirmative, speech_type) VALUES (%s, %s, %s, %s)",
+            (entry["legislation_id"], entry["speaker_id"], entry["is_affirmative"], stype),
+        )
+        speech_id = cur.lastrowid
+        cur.execute("UPDATE speech_queue SET status = 'speaking' WHERE id = %s", (queue_id,))
+        cur.execute(
+            "UPDATE session_state SET current_speech_id = %s, phase = 'speech_in_progress' WHERE id = 1",
+            (speech_id,),
+        )
+        conn.commit()
     return jsonify({"ok": True, "speech_id": speech_id})
 
 
@@ -543,22 +506,19 @@ def api_speech_complete():
     if err:
         return err
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT current_speech_id FROM session_state WHERE id = 1")
-    state = cur.fetchone()
-    if not state or not state["current_speech_id"]:
-        cur.close(); conn.close()
-        return jsonify({"error": "No speech in progress"}), 400
+    with get_db() as (conn, cur):
+        cur.execute("SELECT current_speech_id FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state["current_speech_id"]:
+            return jsonify({"error": "No speech in progress"}), 400
 
-    cur.execute(
-        "UPDATE speech_queue SET status = 'done' WHERE speaker_id = "
-        "(SELECT speaker_id FROM speeches WHERE id = %s) AND status = 'speaking'",
-        (state["current_speech_id"],),
-    )
-    cur.execute("UPDATE session_state SET phase = 'questioning' WHERE id = 1")
-    conn.commit()
-    cur.close(); conn.close()
+        cur.execute(
+            "UPDATE speech_queue SET status = 'done' WHERE speaker_id = "
+            "(SELECT speaker_id FROM speeches WHERE id = %s) AND status = 'speaking'",
+            (state["current_speech_id"],),
+        )
+        cur.execute("UPDATE session_state SET phase = 'questioning' WHERE id = 1")
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -568,20 +528,18 @@ def api_speech_end_questioning():
     if err:
         return err
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
-    cur.execute("SELECT current_speech_id FROM session_state WHERE id = 1")
-    state = cur.fetchone()
+    with get_db() as (conn, cur):
+        cur.execute("SELECT current_speech_id FROM session_state WHERE id = 1")
+        state = cur.fetchone()
 
-    if state and state["current_speech_id"]:
-        cur.execute(
-            "UPDATE question_queue SET status = 'cancelled' WHERE speech_id = %s AND status IN ('waiting','asking')",
-            (state["current_speech_id"],),
-        )
+        if state and state["current_speech_id"]:
+            cur.execute(
+                "UPDATE question_queue SET status = 'cancelled' WHERE speech_id = %s AND status IN ('waiting','asking')",
+                (state["current_speech_id"],),
+            )
 
-    cur.execute("UPDATE session_state SET current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1")
-    conn.commit()
-    cur.close(); conn.close()
+        cur.execute("UPDATE session_state SET current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1")
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -595,39 +553,33 @@ def api_question_request():
     if not uid:
         return jsonify({"error": "Login required"}), 401
 
-    conn = get_conn()
-    cur = conn.cursor(dictionary=True)
+    with get_db() as (conn, cur):
+        cur.execute("SELECT current_speech_id, phase FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or state["phase"] != "questioning" or not state["current_speech_id"]:
+            return jsonify({"error": "Not in questioning phase"}), 400
 
-    cur.execute("SELECT current_speech_id, phase FROM session_state WHERE id = 1")
-    state = cur.fetchone()
-    if not state or state["phase"] != "questioning" or not state["current_speech_id"]:
-        cur.close(); conn.close()
-        return jsonify({"error": "Not in questioning phase"}), 400
+        sid = state["current_speech_id"]
 
-    sid = state["current_speech_id"]
+        # Can't question your own speech
+        cur.execute("SELECT speaker_id FROM speeches WHERE id = %s", (sid,))
+        speech = cur.fetchone()
+        if speech and speech["speaker_id"] == uid:
+            return jsonify({"error": "Cannot question your own speech"}), 400
 
-    # Can't question your own speech
-    cur.execute("SELECT speaker_id FROM speeches WHERE id = %s", (sid,))
-    speech = cur.fetchone()
-    if speech and speech["speaker_id"] == uid:
-        cur.close(); conn.close()
-        return jsonify({"error": "Cannot question your own speech"}), 400
+        # Already in queue?
+        cur.execute(
+            "SELECT id FROM question_queue WHERE speech_id = %s AND speaker_id = %s AND status = 'waiting'",
+            (sid, uid),
+        )
+        if cur.fetchone():
+            return jsonify({"error": "Already in question queue"}), 400
 
-    # Already in queue?
-    cur.execute(
-        "SELECT id FROM question_queue WHERE speech_id = %s AND speaker_id = %s AND status = 'waiting'",
-        (sid, uid),
-    )
-    if cur.fetchone():
-        cur.close(); conn.close()
-        return jsonify({"error": "Already in question queue"}), 400
-
-    cur.execute(
-        "INSERT INTO question_queue (speech_id, speaker_id) VALUES (%s, %s)",
-        (sid, uid),
-    )
-    conn.commit()
-    cur.close(); conn.close()
+        cur.execute(
+            "INSERT INTO question_queue (speech_id, speaker_id) VALUES (%s, %s)",
+            (sid, uid),
+        )
+        conn.commit()
     return jsonify({"ok": True}), 201
 
 
@@ -636,11 +588,9 @@ def api_question_select(queue_id):
     err = po_api_guard()
     if err:
         return err
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("UPDATE question_queue SET status = 'asking' WHERE id = %s AND status = 'waiting'", (queue_id,))
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute("UPDATE question_queue SET status = 'asking' WHERE id = %s AND status = 'waiting'", (queue_id,))
+        conn.commit()
     return jsonify({"ok": True})
 
 
@@ -649,11 +599,9 @@ def api_question_done(queue_id):
     err = po_api_guard()
     if err:
         return err
-    conn = get_conn()
-    cur = conn.cursor()
-    cur.execute("UPDATE question_queue SET status = 'done' WHERE id = %s", (queue_id,))
-    conn.commit()
-    cur.close(); conn.close()
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute("UPDATE question_queue SET status = 'done' WHERE id = %s", (queue_id,))
+        conn.commit()
     return jsonify({"ok": True})
 
 
