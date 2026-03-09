@@ -1,6 +1,33 @@
 /* ===== Session Buddy — Client JS ===== */
 
 // ---------------------------------------------------------------------------
+// Dark Mode
+// ---------------------------------------------------------------------------
+
+function toggleDarkMode() {
+  var html = document.documentElement;
+  html.classList.add('theme-transition');
+  html.classList.toggle('dark');
+  var isDark = html.classList.contains('dark');
+  try { localStorage.setItem('sb-dark-mode', isDark); } catch (e) { /* storage unavailable */ }
+  updateDarkToggleIcons(isDark);
+  setTimeout(function() { html.classList.remove('theme-transition'); }, 300);
+}
+
+function updateDarkToggleIcons(isDark) {
+  var sun = document.getElementById('sunIcon');
+  var moon = document.getElementById('moonIcon');
+  if (!sun || !moon) return;
+  if (isDark) {
+    sun.classList.remove('hidden');
+    moon.classList.add('hidden');
+  } else {
+    sun.classList.add('hidden');
+    moon.classList.remove('hidden');
+  }
+}
+
+// ---------------------------------------------------------------------------
 // Utility
 // ---------------------------------------------------------------------------
 
@@ -580,6 +607,7 @@ async function doneQuestion(queueId) {
 // ---------------------------------------------------------------------------
 
 document.addEventListener("DOMContentLoaded", function() {
+  updateDarkToggleIcons(document.documentElement.classList.contains('dark'));
   initAuthForms();
   initLogout();
   initSpeakerDashboard();
