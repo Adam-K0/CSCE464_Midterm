@@ -210,7 +210,7 @@ function renderSpeakerView(s) {
     var cs2 = s.current_speech;
     currentHtml =
       '<div class="card phase-card-question mb-4 p-5">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold dark:bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning Period</h3></div>' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning Period</h3></div>' +
         '<p class="mb-3">Questions for: <strong>' + cs2.full_name + '</strong> (' + cs2.school + ')</p>' +
         '<button onclick="requestToQuestion()" class="btn btn-primary">Raise Hand to Question</button>' +
       '</div>';
@@ -486,7 +486,7 @@ function renderPODebatePanel(s) {
     var cs2 = s.current_speech;
     currentHtml =
       '<div class="card phase-card-question p-4 mb-3">' +
-        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold dark:bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning: ' + cs2.full_name + '</h4></div>';
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Questioning: ' + cs2.full_name + '</h4></div>';
     if (s.question_queue.length) {
       currentHtml += '<ul class="text-sm mt-2 space-y-1">';
       for (var j = 0; j < s.question_queue.length; j++) {
