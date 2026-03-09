@@ -5,13 +5,13 @@
 // ---------------------------------------------------------------------------
 
 function toggleDarkMode() {
-  var html = document.documentElement;
-  html.classList.add('theme-transition');
-  html.classList.toggle('dark');
-  var isDark = html.classList.contains('dark');
+  var root = document.documentElement;
+  root.classList.add('theme-transition');
+  root.classList.toggle('dark');
+  var isDark = root.classList.contains('dark');
   try { localStorage.setItem('sb-dark-mode', isDark); } catch (e) { /* storage unavailable */ }
   updateDarkToggleIcons(isDark);
-  setTimeout(function() { html.classList.remove('theme-transition'); }, 300);
+  setTimeout(function() { root.classList.remove('theme-transition'); }, 300);
 }
 
 function updateDarkToggleIcons(isDark) {
