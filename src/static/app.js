@@ -131,6 +131,126 @@ function initLogout() {
 // ---------------------------------------------------------------------------
 
 var pollTimer = null;
+var timerTicker = null;
+var latestSessionState = null;
+
+function getTimerState(s) {
+  return s && s.timer ? s.timer : { status: "idle", elapsed_seconds: 0, started_at: null };
+}
+
+function getTimerElapsedSeconds(timer) {
+  timer = timer || { status: "idle", elapsed_seconds: 0, started_at: null };
+  var elapsed = timer.elapsed_seconds || 0;
+  if (timer.status === "running" && timer.started_at) {
+    var startedAt = Date.parse(timer.started_at);
+    if (!isNaN(startedAt)) {
+      elapsed += Math.floor((Date.now() - startedAt) / 1000);
+    }
+  }
+  return Math.max(0, elapsed);
+}
+
+function formatTimer(seconds) {
+  seconds = Math.max(0, Math.floor(seconds || 0));
+  var minutes = Math.floor(seconds / 60);
+  var remainder = seconds % 60;
+  return String(minutes).padStart(2, "0") + ":" + String(remainder).padStart(2, "0");
+}
+
+function getTimerStatusLabel(timer) {
+  if (!timer) return "Idle";
+  if (timer.status === "running") return "Running";
+  if (timer.status === "paused") return "Paused";
+  if (timer.status === "stopped") return "Recorded";
+  return "Idle";
+}
+
+function getTimerStatusClass(timer) {
+  if (!timer) return "badge-gray";
+  if (timer.status === "running") return "badge-green";
+  if (timer.status === "paused") return "badge-yellow";
+  if (timer.status === "stopped") return "badge-blue";
+  return "badge-gray";
+}
+
+function updateTimerDisplay() {
+  if (!latestSessionState) return;
+  var timer = getTimerState(latestSessionState);
+  var value = formatTimer(getTimerElapsedSeconds(timer));
+  var status = getTimerStatusLabel(timer);
+
+  var valueNodes = document.querySelectorAll("[data-timer-value]");
+  for (var i = 0; i < valueNodes.length; i++) {
+    valueNodes[i].textContent = value;
+  }
+
+  var statusNodes = document.querySelectorAll("[data-timer-status]");
+  for (var j = 0; j < statusNodes.length; j++) {
+    statusNodes[j].textContent = status;
+  }
+
+  var statusBadges = document.querySelectorAll("[data-timer-status-badge]");
+  var statusClass = getTimerStatusClass(timer);
+  for (var k = 0; k < statusBadges.length; k++) {
+    statusBadges[k].className = "badge " + statusClass;
+    statusBadges[k].textContent = status.toUpperCase();
+  }
+}
+
+function startTimerTicker() {
+  if (timerTicker) clearInterval(timerTicker);
+  timerTicker = setInterval(updateTimerDisplay, 1000);
+}
+
+function renderTimerCard(s, options) {
+  options = options || {};
+  var timer = getTimerState(s);
+  if (!s || !s.current_speech || timer.status === "idle") return "";
+
+  var controls = options.controls && s.phase === "speech_in_progress";
+  var value = formatTimer(getTimerElapsedSeconds(timer));
+  var status = getTimerStatusLabel(timer);
+  var statusClass = getTimerStatusClass(timer);
+  var title = options.title || "Speech Timer";
+  var subtitle = options.subtitle || (timer.status === "stopped" ? "Recorded speech time" : "Live stopwatch");
+  var controlsHtml = "";
+
+  if (controls) {
+    if (timer.status === "running") {
+      controlsHtml =
+        '<div class="flex flex-wrap gap-2 mt-3">' +
+          '<button onclick="pauseSpeechTimer()" class="btn btn-gray btn-sm">Pause</button>' +
+          '<button onclick="stopSpeechTimer()" class="btn btn-red btn-sm">Stop &amp; Record</button>' +
+          '<button onclick="resetSpeechTimer()" class="btn btn-blue btn-sm">Reset</button>' +
+        '</div>';
+    } else if (timer.status === "paused") {
+      controlsHtml =
+        '<div class="flex flex-wrap gap-2 mt-3">' +
+          '<button onclick="resumeSpeechTimer()" class="btn btn-green btn-sm">Resume</button>' +
+          '<button onclick="stopSpeechTimer()" class="btn btn-red btn-sm">Stop &amp; Record</button>' +
+          '<button onclick="resetSpeechTimer()" class="btn btn-blue btn-sm">Reset</button>' +
+        '</div>';
+    }
+  }
+
+  return '' +
+    '<div class="card timer-card p-4 mb-4">' +
+      '<div class="flex items-center justify-between gap-3 flex-wrap">' +
+        '<div>' +
+          '<h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">' + title + '</h3>' +
+          '<p class="text-xs text-gray-400 mt-1">' + subtitle + '</p>' +
+        '</div>' +
+        '<span class="badge ' + statusClass + '" data-timer-status-badge>' + status.toUpperCase() + '</span>' +
+      '</div>' +
+      '<div class="mt-3 flex items-end gap-3 flex-wrap">' +
+        '<div class="timer-value" data-timer-value>' + value + '</div>' +
+        '<div class="text-sm text-gray-500 dark:text-gray-400 pb-1">' +
+          '<span data-timer-status>' + status + '</span>' +
+        '</div>' +
+      '</div>' +
+      controlsHtml +
+    '</div>';
+}
 
 function initSpeakerDashboard() {
   var el = document.getElementById("speakerDashboard");
@@ -142,6 +262,7 @@ function initSpeakerDashboard() {
 async function pollState() {
   try {
     var data = await api("/api/session/state");
+    latestSessionState = data;
     renderSpeakerView(data);
   } catch (e) {
     // silently retry on next interval
@@ -214,6 +335,8 @@ function renderSpeakerView(s) {
     }
   }
 
+  var timerHtml = renderTimerCard(s, { title: "Speech Stopwatch" });
+
   // Speech queue
   var queueHtml = "";
   if (s.speech_queue.length) {
@@ -245,6 +368,7 @@ function renderSpeakerView(s) {
       '<p class="font-semibold text-sm">Next speech needed: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
     '</div>' +
     currentHtml +
+    timerHtml +
     actionHtml +
     queueHtml +
     historyHtml;
@@ -398,6 +522,7 @@ async function resetSession() {
 async function pollPOState() {
   try {
     var data = await api("/api/session/state");
+    latestSessionState = data;
     renderPODebatePanel(data);
   } catch (e) {
     // retry next interval
@@ -443,7 +568,6 @@ function renderPODebatePanel(s) {
       '<div class="card phase-card-speaking p-4 mb-3">' +
         '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Currently Speaking</h4></div>' +
         '<p class="text-lg font-semibold">' + cs.full_name + ' <span class="text-gray-400 font-normal">(' + cs.school + ')</span> &mdash; <span class="' + ctagColor + ' font-bold">' + ctag + '</span> <span class="text-gray-400">[' + cs.speech_type + ']</span></p>' +
-        '<button onclick="completeSpeech()" class="btn btn-primary mt-3">Speech Done &rarr; Questioning</button>' +
       '</div>';
   } else if (s.phase === "questioning" && s.current_speech) {
     var cs2 = s.current_speech;
@@ -468,6 +592,8 @@ function renderPODebatePanel(s) {
     }
     currentHtml += '<button onclick="endQuestioning()" class="btn btn-gray mt-3">End Questioning &rarr; Next Speech</button></div>';
   }
+
+  var timerHtml = renderTimerCard(s, { controls: true, title: "Speech Stopwatch" });
 
   // Speech queue with recommendation
   var queueHtml = "";
@@ -513,6 +639,7 @@ function renderPODebatePanel(s) {
       '<p class="mt-3 font-semibold text-sm">Next: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
     '</div>' +
     currentHtml +
+    timerHtml +
     queueHtml +
     historyHtml;
 }
@@ -527,6 +654,31 @@ async function selectSpeaker(queueId) {
 async function completeSpeech() {
   try {
     await api("/api/speech/complete", { method: "POST" });
+    pollPOState();
+  } catch (err) { /* ignored */ }
+}
+
+async function stopSpeechTimer() {
+  return completeSpeech();
+}
+
+async function pauseSpeechTimer() {
+  try {
+    await api("/api/speech/timer/pause", { method: "POST" });
+    pollPOState();
+  } catch (err) { /* ignored */ }
+}
+
+async function resumeSpeechTimer() {
+  try {
+    await api("/api/speech/timer/resume", { method: "POST" });
+    pollPOState();
+  } catch (err) { /* ignored */ }
+}
+
+async function resetSpeechTimer() {
+  try {
+    await api("/api/speech/timer/reset", { method: "POST" });
     pollPOState();
   } catch (err) { /* ignored */ }
 }
@@ -562,4 +714,5 @@ document.addEventListener("DOMContentLoaded", function() {
   initLogout();
   initSpeakerDashboard();
   initPODashboard();
+  startTimerTicker();
 });

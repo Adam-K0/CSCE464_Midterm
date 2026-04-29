@@ -2,6 +2,7 @@ from flask import Flask, render_template, request, jsonify, session, redirect, u
 from werkzeug.security import generate_password_hash, check_password_hash
 from functools import wraps
 from db import get_db
+from datetime import datetime
 import secrets
 
 app = Flask(__name__)
@@ -260,6 +261,76 @@ def _iso(dt):
     return dt.isoformat() if dt else None
 
 
+def _timer_elapsed_seconds(state, now=None):
+    if not state:
+        return 0
+
+    elapsed = int(state.get("timer_elapsed_seconds") or 0)
+    status = state.get("timer_status") or "idle"
+    started_at = state.get("timer_started_at")
+
+    if status == "running" and started_at:
+        now = now or datetime.now()
+        elapsed += max(0, int((now - started_at).total_seconds()))
+
+    return elapsed
+
+
+def _timer_payload(state, now=None):
+    if not state:
+        return {"status": "idle", "elapsed_seconds": 0, "started_at": None}
+
+    return {
+        "status": state.get("timer_status") or "idle",
+        "elapsed_seconds": _timer_elapsed_seconds(state, now=now),
+        "started_at": _iso(state.get("timer_started_at")),
+    }
+
+
+def _reset_timer_state(cur, status="idle", elapsed_seconds=0, started_at=None):
+    cur.execute(
+        "UPDATE session_state SET timer_status = %s, timer_elapsed_seconds = %s, timer_started_at = %s WHERE id = 1",
+        (status, elapsed_seconds, started_at),
+    )
+
+
+def _finalize_active_speech_timer(cur):
+    cur.execute("SELECT * FROM session_state WHERE id = 1")
+    state = cur.fetchone()
+    if not state or not state.get("current_speech_id"):
+        return 0
+
+    final_elapsed = _timer_elapsed_seconds(state)
+    cur.execute(
+        "UPDATE speeches SET duration_seconds = %s WHERE id = %s",
+        (final_elapsed, state["current_speech_id"]),
+    )
+    _reset_timer_state(cur, status="stopped", elapsed_seconds=final_elapsed, started_at=None)
+    return final_elapsed
+
+
+def ensure_timer_schema():
+    with get_db(dictionary=False) as (conn, cur):
+        cur.execute("SHOW COLUMNS FROM session_state LIKE 'timer_status'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE session_state ADD COLUMN timer_status ENUM('idle', 'running', 'paused', 'stopped') NOT NULL DEFAULT 'idle'")
+
+        cur.execute("SHOW COLUMNS FROM session_state LIKE 'timer_elapsed_seconds'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE session_state ADD COLUMN timer_elapsed_seconds INT NOT NULL DEFAULT 0")
+
+        cur.execute("SHOW COLUMNS FROM session_state LIKE 'timer_started_at'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE session_state ADD COLUMN timer_started_at DATETIME DEFAULT NULL")
+
+        cur.execute("SHOW COLUMNS FROM speeches LIKE 'duration_seconds'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE speeches ADD COLUMN duration_seconds INT NOT NULL DEFAULT 0")
+
+        cur.execute("UPDATE session_state SET timer_status = COALESCE(timer_status, 'idle'), timer_elapsed_seconds = COALESCE(timer_elapsed_seconds, 0) WHERE id = 1")
+        conn.commit()
+
+
 @app.get("/api/session/state")
 def api_session_state():
     with get_db() as (conn, cur):
@@ -274,6 +345,7 @@ def api_session_state():
             "speech_queue": [],
             "question_queue": [],
             "next_side": None,
+            "timer": _timer_payload(state),
         }
 
         if not state or not state["active_legislation_id"]:
@@ -287,8 +359,8 @@ def api_session_state():
 
         # Speeches on this legislation
         cur.execute("""
-            SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
-                   s.speech_type, s.created_at, sp.full_name, sp.school
+             SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
+                 s.speech_type, s.duration_seconds, s.created_at, sp.full_name, sp.school
             FROM speeches s JOIN speakers sp ON sp.id = s.speaker_id
             WHERE s.legislation_id = %s ORDER BY s.created_at
         """, (leg_id,))
@@ -327,7 +399,7 @@ def api_session_state():
         if state["current_speech_id"]:
             cur.execute("""
                 SELECT s.id, s.legislation_id, s.speaker_id, s.is_affirmative,
-                       s.speech_type, s.created_at, sp.full_name, sp.school
+                       s.speech_type, s.duration_seconds, s.created_at, sp.full_name, sp.school
                 FROM speeches s JOIN speakers sp ON sp.id = s.speaker_id
                 WHERE s.id = %s
             """, (state["current_speech_id"],))
@@ -349,6 +421,8 @@ def api_session_state():
                 r["created_at"] = _iso(r["created_at"])
             result["question_queue"] = qqueue
 
+        result["timer"] = _timer_payload(state)
+
     return jsonify(result)
 
 
@@ -364,7 +438,7 @@ def api_session_open_debate():
 
     with get_db(dictionary=False) as (conn, cur):
         cur.execute(
-            "UPDATE session_state SET active_legislation_id = %s, current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1",
+            "UPDATE session_state SET active_legislation_id = %s, current_speech_id = NULL, phase = 'speech_queue', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1",
             (leg_id,),
         )
         cur.execute("UPDATE legislation SET status = 'active' WHERE id = %s", (leg_id,))
@@ -384,10 +458,11 @@ def api_session_close_debate():
 
         if state and state["active_legislation_id"]:
             lid = state["active_legislation_id"]
+            _finalize_active_speech_timer(cur)
             cur.execute("UPDATE legislation SET status = 'completed' WHERE id = %s", (lid,))
             cur.execute("UPDATE speech_queue SET status = 'cancelled' WHERE legislation_id = %s AND status = 'waiting'", (lid,))
         cur.execute(
-            "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1"
+            "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1"
         )
         conn.commit()
     return jsonify({"ok": True})
@@ -403,7 +478,7 @@ def api_session_reset():
         cur.execute("DELETE FROM question_queue")
         cur.execute("DELETE FROM speech_queue")
         cur.execute("DELETE FROM speeches")
-        cur.execute("UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle' WHERE id = 1")
+        cur.execute("UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1")
         cur.execute("UPDATE legislation SET status = 'pending'")
         conn.commit()
     return jsonify({"ok": True})
@@ -487,13 +562,13 @@ def api_speech_select(queue_id):
             stype = "regular"
 
         cur.execute(
-            "INSERT INTO speeches (legislation_id, speaker_id, is_affirmative, speech_type) VALUES (%s, %s, %s, %s)",
+            "INSERT INTO speeches (legislation_id, speaker_id, is_affirmative, speech_type, duration_seconds) VALUES (%s, %s, %s, %s, 0)",
             (entry["legislation_id"], entry["speaker_id"], entry["is_affirmative"], stype),
         )
         speech_id = cur.lastrowid
         cur.execute("UPDATE speech_queue SET status = 'speaking' WHERE id = %s", (queue_id,))
         cur.execute(
-            "UPDATE session_state SET current_speech_id = %s, phase = 'speech_in_progress' WHERE id = 1",
+            "UPDATE session_state SET current_speech_id = %s, phase = 'speech_in_progress', timer_status = 'running', timer_elapsed_seconds = 0, timer_started_at = NOW() WHERE id = 1",
             (speech_id,),
         )
         conn.commit()
@@ -512,6 +587,7 @@ def api_speech_complete():
         if not state or not state["current_speech_id"]:
             return jsonify({"error": "No speech in progress"}), 400
 
+        _finalize_active_speech_timer(cur)
         cur.execute(
             "UPDATE speech_queue SET status = 'done' WHERE speaker_id = "
             "(SELECT speaker_id FROM speeches WHERE id = %s) AND status = 'speaking'",
@@ -520,6 +596,63 @@ def api_speech_complete():
         cur.execute("UPDATE session_state SET phase = 'questioning' WHERE id = 1")
         conn.commit()
     return jsonify({"ok": True})
+
+
+@app.post("/api/speech/timer/pause")
+def api_speech_timer_pause():
+    err = po_api_guard()
+    if err:
+        return err
+
+    with get_db() as (conn, cur):
+        cur.execute("SELECT * FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state.get("current_speech_id"):
+            return jsonify({"error": "No speech in progress"}), 400
+        if state.get("timer_status") != "running":
+            return jsonify({"error": "Timer is not running"}), 400
+
+        elapsed = _timer_elapsed_seconds(state)
+        _reset_timer_state(cur, status="paused", elapsed_seconds=elapsed, started_at=None)
+        conn.commit()
+    return jsonify({"ok": True, "timer": {"status": "paused", "elapsed_seconds": elapsed}})
+
+
+@app.post("/api/speech/timer/resume")
+def api_speech_timer_resume():
+    err = po_api_guard()
+    if err:
+        return err
+
+    with get_db() as (conn, cur):
+        cur.execute("SELECT * FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state.get("current_speech_id"):
+            return jsonify({"error": "No speech in progress"}), 400
+        if state.get("timer_status") != "paused":
+            return jsonify({"error": "Timer is not paused"}), 400
+
+        cur.execute("UPDATE session_state SET timer_status = 'running', timer_started_at = NOW() WHERE id = 1")
+        conn.commit()
+        elapsed = _timer_elapsed_seconds(state)
+    return jsonify({"ok": True, "timer": {"status": "running", "elapsed_seconds": elapsed}})
+
+
+@app.post("/api/speech/timer/reset")
+def api_speech_timer_reset():
+    err = po_api_guard()
+    if err:
+        return err
+
+    with get_db() as (conn, cur):
+        cur.execute("SELECT * FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state.get("current_speech_id"):
+            return jsonify({"error": "No speech in progress"}), 400
+
+        _reset_timer_state(cur, status="paused", elapsed_seconds=0, started_at=None)
+        conn.commit()
+    return jsonify({"ok": True, "timer": {"status": "paused", "elapsed_seconds": 0}})
 
 
 @app.post("/api/speech/end-questioning")
@@ -538,7 +671,7 @@ def api_speech_end_questioning():
                 (state["current_speech_id"],),
             )
 
-        cur.execute("UPDATE session_state SET current_speech_id = NULL, phase = 'speech_queue' WHERE id = 1")
+        cur.execute("UPDATE session_state SET current_speech_id = NULL, phase = 'speech_queue', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1")
         conn.commit()
     return jsonify({"ok": True})
 
@@ -610,4 +743,5 @@ def api_question_done(queue_id):
 # ---------------------------------------------------------------------------
 
 if __name__ == "__main__":
+    ensure_timer_schema()
     app.run(debug=True, port=5000)

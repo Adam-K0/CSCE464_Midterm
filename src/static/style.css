@@ -185,6 +185,20 @@ textarea.form-input { resize: vertical; min-height: 4rem; }
   border-color: var(--sb-gold);
 }
 
+/* --- Speech timer --- */
+.timer-card {
+  border-color: rgba(0, 46, 93, 0.14);
+  background: linear-gradient(180deg, rgba(255,255,255,0.9), rgba(247,248,250,0.98));
+}
+.timer-value {
+  font-size: 2.5rem;
+  line-height: 1;
+  font-weight: 900;
+  letter-spacing: 0.02em;
+  color: var(--sb-navy-dark);
+  font-variant-numeric: tabular-nums;
+}
+
 /* --- Scrollbar --- */
 ::-webkit-scrollbar { width: 8px; }
 ::-webkit-scrollbar-track { background: var(--sb-gray-100); }
@@ -237,6 +251,14 @@ textarea.form-input { resize: vertical; min-height: 4rem; }
 .dark .phase-card-speaking {
   background: rgba(255, 184, 28, 0.12);
   border-color: rgba(255, 184, 28, 0.3);
+}
+
+.dark .timer-card {
+  background: linear-gradient(180deg, rgba(13,13,26,0.95), rgba(20,20,32,0.98));
+  border-color: rgba(255, 184, 28, 0.22);
+}
+.dark .timer-value {
+  color: var(--sb-gold);
 }
 
 /* --- Dark mode: badges --- */

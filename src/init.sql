@@ -43,7 +43,10 @@ CREATE TABLE session_state (
   id INT PRIMARY KEY DEFAULT 1,
   active_legislation_id INT DEFAULT NULL,
   current_speech_id INT DEFAULT NULL,
-  phase ENUM('idle', 'speech_queue', 'speech_in_progress', 'questioning') NOT NULL DEFAULT 'idle'
+  phase ENUM('idle', 'speech_queue', 'speech_in_progress', 'questioning') NOT NULL DEFAULT 'idle',
+  timer_status ENUM('idle', 'running', 'paused', 'stopped') NOT NULL DEFAULT 'idle',
+  timer_elapsed_seconds INT NOT NULL DEFAULT 0,
+  timer_started_at DATETIME DEFAULT NULL
 );
 INSERT INTO session_state (id) VALUES (1);
 
@@ -56,6 +59,7 @@ CREATE TABLE speeches (
   speaker_id INT NOT NULL,
   is_affirmative BOOLEAN NOT NULL,
   speech_type ENUM('authorship', 'first_negative', 'regular') NOT NULL DEFAULT 'regular',
+  duration_seconds INT NOT NULL DEFAULT 0,
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (legislation_id) REFERENCES legislation(id),
   FOREIGN KEY (speaker_id) REFERENCES speakers(id)
