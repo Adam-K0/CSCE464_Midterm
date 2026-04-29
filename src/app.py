@@ -347,6 +347,70 @@ def _vote_summary(cur, leg_id, user_id=None):
     }
 
 
+def _speaker_stats(cur, leg_id):
+    cur.execute(
+        """
+        SELECT DISTINCT speaker_id
+        FROM (
+            SELECT speaker_id FROM speech_queue WHERE legislation_id = %s
+            UNION
+            SELECT speaker_id FROM speeches WHERE legislation_id = %s
+            UNION
+            SELECT qq.speaker_id
+            FROM question_queue qq
+            JOIN speeches s ON s.id = qq.speech_id
+            WHERE s.legislation_id = %s
+        ) AS session_speakers
+        ORDER BY speaker_id
+        """,
+        (leg_id, leg_id, leg_id),
+    )
+    speaker_ids = [row["speaker_id"] for row in cur.fetchall()]
+    if not speaker_ids:
+        return []
+
+    stats = []
+    for speaker_id in speaker_ids:
+        cur.execute(
+            "SELECT id, full_name, school FROM speakers WHERE id = %s",
+            (speaker_id,),
+        )
+        speaker = cur.fetchone()
+        if not speaker:
+            continue
+
+        cur.execute(
+            "SELECT COUNT(*) AS speeches_count, COALESCE(AVG(duration_seconds), 0) AS avg_seconds FROM speeches WHERE legislation_id = %s AND speaker_id = %s",
+            (leg_id, speaker_id),
+        )
+        speech_row = cur.fetchone() or {}
+
+        cur.execute(
+            """
+            SELECT COUNT(*) AS questions_count
+            FROM question_queue qq
+            JOIN speeches s ON s.id = qq.speech_id
+            WHERE s.legislation_id = %s AND qq.speaker_id = %s
+            """,
+            (leg_id, speaker_id),
+        )
+        question_row = cur.fetchone() or {}
+
+        stats.append(
+            {
+                "id": speaker["id"],
+                "full_name": speaker["full_name"],
+                "school": speaker["school"],
+                "speeches_count": int((speech_row.get("speeches_count") if speech_row else 0) or 0),
+                "questions_count": int((question_row.get("questions_count") if question_row else 0) or 0),
+                "avg_speaking_seconds": int(round(float((speech_row.get("avg_seconds") if speech_row else 0) or 0))),
+            }
+        )
+
+    stats.sort(key=lambda row: (-row["speeches_count"], -row["questions_count"], row["full_name"].lower()))
+    return stats
+
+
 def ensure_timer_schema():
     with get_db() as (conn, cur):
         cur.execute("SHOW COLUMNS FROM session_state LIKE 'phase'")
@@ -411,6 +475,7 @@ def api_session_state():
             "next_side": None,
             "timer": _timer_payload(state),
             "voting": None,
+            "speaker_stats": [],
         }
 
         if not state or not state["active_legislation_id"]:
@@ -488,6 +553,7 @@ def api_session_state():
 
         result["timer"] = _timer_payload(state)
         result["voting"] = _vote_summary(cur, leg_id, user_id=session.get("user_id"))
+        result["speaker_stats"] = _speaker_stats(cur, leg_id)
 
     return jsonify(result)
 

@@ -252,6 +252,50 @@ function renderTimerCard(s, options) {
     '</div>';
 }
 
+function formatDuration(seconds) {
+  return formatTimer(seconds || 0);
+}
+
+function renderSpeakerStatsTable(s) {
+  var stats = s && s.speaker_stats ? s.speaker_stats : [];
+  if (!stats.length) return "";
+
+  var html =
+    '<div class="card p-4 mb-4">' +
+      '<div class="flex items-center justify-between gap-3 flex-wrap mb-3">' +
+        '<h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Speaker Statistics</h3>' +
+        '<p class="text-xs text-gray-400">Ranked by speeches</p>' +
+      '</div>' +
+      '<div class="overflow-x-auto">' +
+        '<table class="min-w-full text-sm">' +
+          '<thead>' +
+            '<tr class="border-b border-gray-200 dark:border-gray-700 text-left text-gray-500 dark:text-gray-400">' +
+              '<th class="py-2 pr-4 font-semibold">Speaker</th>' +
+              '<th class="py-2 px-3 font-semibold text-center">Speeches</th>' +
+              '<th class="py-2 px-3 font-semibold text-center">Questions</th>' +
+              '<th class="py-2 pl-3 font-semibold text-right">Avg Speak Time</th>' +
+            '</tr>' +
+          '</thead>' +
+          '<tbody>';
+
+  for (var i = 0; i < stats.length; i++) {
+    var row = stats[i];
+    html +=
+      '<tr class="border-b border-gray-100 dark:border-gray-800 last:border-b-0">' +
+        '<td class="py-2 pr-4">' +
+          '<div class="font-semibold text-gray-800 dark:text-gray-100">' + row.full_name + '</div>' +
+          '<div class="text-xs text-gray-400">' + row.school + '</div>' +
+        '</td>' +
+        '<td class="py-2 px-3 text-center font-bold text-sb-navy dark:text-sb-gold">' + row.speeches_count + '</td>' +
+        '<td class="py-2 px-3 text-center font-semibold text-gray-700 dark:text-gray-200">' + row.questions_count + '</td>' +
+        '<td class="py-2 pl-3 text-right font-mono text-gray-700 dark:text-gray-200">' + formatDuration(row.avg_speaking_seconds) + '</td>' +
+      '</tr>';
+  }
+
+  html += '</tbody></table></div></div>';
+  return html;
+}
+
 function initSpeakerDashboard() {
   var el = document.getElementById("speakerDashboard");
   if (!el) return;
@@ -394,6 +438,7 @@ function renderSpeakerView(s) {
     currentHtml +
     timerHtml +
     votingHtml +
+    renderSpeakerStatsTable(s) +
     actionHtml +
     queueHtml +
     historyHtml;
@@ -649,6 +694,8 @@ function renderPODebatePanel(s) {
 
   var timerHtml = renderTimerCard(s, { controls: true, title: "Speech Stopwatch" });
 
+  var statsHtml = renderSpeakerStatsTable(s);
+
   // Speech queue with recommendation
   var queueHtml = "";
   if (s.phase === "speech_queue") {
@@ -696,6 +743,7 @@ function renderPODebatePanel(s) {
     '</div>' +
     currentHtml +
     timerHtml +
+    statsHtml +
     queueHtml +
     historyHtml;
 }
