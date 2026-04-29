@@ -292,6 +292,7 @@ function renderSpeakerView(s) {
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
   else if (s.speeches.length === 1) speechLabel = "(First Negative)";
+  var isVoting = s.phase === "voting";
 
   // Speech history
   var historyHtml = "";
@@ -337,6 +338,27 @@ function renderSpeakerView(s) {
 
   var timerHtml = renderTimerCard(s, { title: "Speech Stopwatch" });
 
+  var votingHtml = "";
+  if (isVoting) {
+    var voting = s.voting || { for_count: 0, against_count: 0, abstain_count: 0, total_speakers: 0, user_vote: null };
+    var voteStatus = voting.user_vote
+      ? '<span class="badge badge-blue">You voted ' + voting.user_vote.toUpperCase() + '</span>'
+      : '<span class="badge badge-yellow">Not voted</span>';
+    votingHtml =
+      '<div class="card phase-card-question p-5 mb-4">' +
+        '<div class="flex items-center justify-between gap-3 flex-wrap mb-3">' +
+          '<h3 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Voting Open</h3>' +
+          voteStatus +
+        '</div>' +
+        '<p class="text-sm mb-3 text-gray-600 dark:text-gray-300">Debate is closed. Cast your vote for this legislation.</p>' +
+        '<div class="flex flex-wrap gap-2 mb-4">' +
+          '<button onclick="castLegislationVote(\'for\')" class="btn btn-green">Vote For</button>' +
+          '<button onclick="castLegislationVote(\'against\')" class="btn btn-red">Vote Against</button>' +
+        '</div>' +
+        '<div class="text-sm text-gray-500 dark:text-gray-400">Current tally: For <strong>' + voting.for_count + '</strong> | Against <strong>' + voting.against_count + '</strong> | Abstain <strong>' + voting.abstain_count + '</strong></div>' +
+      '</div>';
+  }
+
   // Speech queue
   var queueHtml = "";
   if (s.speech_queue.length) {
@@ -365,10 +387,13 @@ function renderSpeakerView(s) {
       '<h2 class="text-xl font-extrabold text-sb-navy dark:text-sb-gold mb-1">' + leg.title + '</h2>' +
       '<p class="text-sm text-gray-400 mb-2">Authored by: ' + leg.school + '</p>' +
       (leg.body ? '<p class="text-sm text-gray-600 dark:text-gray-300 mb-3">' + leg.body + '</p>' : '') +
-      '<p class="font-semibold text-sm">Next speech needed: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
+      (isVoting
+        ? '<p class="font-semibold text-sm text-sb-red">Voting in progress</p>'
+        : '<p class="font-semibold text-sm">Next speech needed: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>') +
     '</div>' +
     currentHtml +
     timerHtml +
+    votingHtml +
     actionHtml +
     queueHtml +
     historyHtml;
@@ -391,6 +416,13 @@ async function cancelSpeechRequest() {
 async function requestToQuestion() {
   try {
     await api("/api/question/request", { method: "POST" });
+    pollState();
+  } catch (err) { /* ignored */ }
+}
+
+async function castLegislationVote(voteChoice) {
+  try {
+    await api("/api/vote", { method: "POST", body: { vote_choice: voteChoice } });
     pollState();
   } catch (err) { /* ignored */ }
 }
@@ -443,6 +475,9 @@ async function loadLegislation() {
         : l.status === "active"
         ? '<span class="badge badge-green">Active</span>'
         : '<span class="badge badge-blue">Pending</span>';
+      var voteBadge = "";
+      if (l.vote_result === "passed") voteBadge = '<span class="badge badge-green">Passed</span>';
+      else if (l.vote_result === "failed") voteBadge = '<span class="badge badge-red">Failed</span>';
       var borderColor = l.status === "active" ? 'border-left-color:#16a34a' : l.status === "completed" ? 'border-left-color:var(--sb-gray-400)' : 'border-left-color:var(--sb-navy)';
       html +=
         '<div class="card p-3 mb-2 flex items-center justify-between border-l-4" style="' + borderColor + '">' +
@@ -451,6 +486,7 @@ async function loadLegislation() {
             '<span class="font-semibold">' + l.title + '</span>' +
             ' <span class="text-xs text-gray-400">(' + l.school + ')</span> ' +
             statusBadge +
+            voteBadge +
           '</div>' +
           '<div class="flex gap-1">' +
             (l.status === "pending" ? '<button onclick="openDebate(' + l.id + ')" class="btn btn-sm btn-green">Open</button>' : '') +
@@ -541,6 +577,7 @@ function renderPODebatePanel(s) {
   var leg = s.active_legislation;
   var side = s.next_side ? "Affirmative" : "Negative";
   var sideColor = s.next_side ? "text-green-700 dark:text-green-400" : "text-sb-red";
+  var isVoting = s.phase === "voting";
 
   var speechLabel = "";
   if (s.speeches.length === 0) speechLabel = "(Authorship/Sponsorship)";
@@ -591,6 +628,23 @@ function renderPODebatePanel(s) {
       currentHtml += '<p class="text-sm text-gray-400 mt-1">No questioners yet.</p>';
     }
     currentHtml += '<button onclick="endQuestioning()" class="btn btn-gray mt-3">End Questioning &rarr; Next Speech</button></div>';
+  } else if (isVoting) {
+    var voting = s.voting || { for_count: 0, against_count: 0, abstain_count: 0, total_speakers: 0, cast_count: 0 };
+    currentHtml =
+      '<div class="card phase-card-question p-4 mb-3">' +
+        '<div class="flex items-center gap-2 mb-2"><span class="w-2 h-2 bg-sb-gold rounded-full animate-pulse"></span><h4 class="font-bold text-sb-navy dark:text-sb-gold text-sm uppercase tracking-wide">Voting Phase</h4></div>' +
+        '<p class="text-sm text-gray-600 dark:text-gray-300 mb-3">Debate is closed. Speakers are voting now.</p>' +
+        '<div class="grid sm:grid-cols-2 gap-2 text-sm mb-4">' +
+          '<div class="card p-3"><span class="text-gray-400">For</span><div class="text-xl font-extrabold text-green-700 dark:text-green-400">' + voting.for_count + '</div></div>' +
+          '<div class="card p-3"><span class="text-gray-400">Against</span><div class="text-xl font-extrabold text-sb-red">' + voting.against_count + '</div></div>' +
+          '<div class="card p-3"><span class="text-gray-400">Abstained</span><div class="text-xl font-extrabold text-sb-navy dark:text-sb-gold">' + voting.abstain_count + '</div></div>' +
+          '<div class="card p-3"><span class="text-gray-400">Votes Cast</span><div class="text-xl font-extrabold text-sb-navy dark:text-sb-gold">' + voting.cast_count + ' / ' + voting.total_speakers + '</div></div>' +
+        '</div>' +
+        '<div class="flex flex-wrap gap-2">' +
+          '<button onclick="finalizeLegislationVote(\'passed\')" class="btn btn-green">Mark Passed</button>' +
+          '<button onclick="finalizeLegislationVote(\'failed\')" class="btn btn-red">Mark Failed</button>' +
+        '</div>' +
+      '</div>';
   }
 
   var timerHtml = renderTimerCard(s, { controls: true, title: "Speech Stopwatch" });
@@ -634,9 +688,11 @@ function renderPODebatePanel(s) {
           '<p class="text-sm text-gray-400">' + leg.school + '</p>' +
           (leg.body ? '<p class="text-sm text-gray-600 dark:text-gray-300 mt-1">' + leg.body + '</p>' : '') +
         '</div>' +
-        '<button onclick="closeDebate()" class="btn btn-sm btn-red uppercase tracking-wide">Close Debate</button>' +
+        (isVoting ? '' : '<button onclick="closeDebate()" class="btn btn-sm btn-red uppercase tracking-wide">Close Debate &amp; Start Vote</button>') +
       '</div>' +
-      '<p class="mt-3 font-semibold text-sm">Next: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>' +
+      (isVoting
+        ? '<p class="mt-3 font-semibold text-sm text-sb-red">Voting in progress</p>'
+        : '<p class="mt-3 font-semibold text-sm">Next: <span class="' + sideColor + ' font-bold text-base">' + side + '</span> ' + speechLabel + '</p>') +
     '</div>' +
     currentHtml +
     timerHtml +
@@ -700,6 +756,14 @@ async function selectQuestioner(queueId) {
 async function doneQuestion(queueId) {
   try {
     await api("/api/question/done/" + queueId, { method: "POST" });
+    pollPOState();
+  } catch (err) { /* ignored */ }
+}
+
+async function finalizeLegislationVote(result) {
+  try {
+    await api("/api/session/finalize-vote", { method: "POST", body: { result: result } });
+    loadLegislation();
     pollPOState();
   } catch (err) { /* ignored */ }
 }

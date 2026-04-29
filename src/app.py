@@ -176,7 +176,7 @@ def api_po_logout():
 @app.get("/api/legislation")
 def api_legislation_list():
     with get_db() as (conn, cur):
-        cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation ORDER BY leg_order")
+        cur.execute("SELECT id, school, title, body, leg_order, status, vote_result FROM legislation ORDER BY leg_order")
         rows = cur.fetchall()
     return jsonify({"legislation": rows})
 
@@ -309,8 +309,52 @@ def _finalize_active_speech_timer(cur):
     return final_elapsed
 
 
+def _vote_summary(cur, leg_id, user_id=None):
+    cur.execute("SELECT COUNT(*) AS total FROM speakers")
+    total = cur.fetchone()["total"]
+
+    cur.execute(
+        """
+        SELECT
+            SUM(CASE WHEN vote_choice = 'for' THEN 1 ELSE 0 END) AS for_count,
+            SUM(CASE WHEN vote_choice = 'against' THEN 1 ELSE 0 END) AS against_count
+        FROM legislation_votes
+        WHERE legislation_id = %s
+        """,
+        (leg_id,),
+    )
+    row = cur.fetchone() or {}
+    for_count = int(row.get("for_count") or 0)
+    against_count = int(row.get("against_count") or 0)
+    cast_total = for_count + against_count
+
+    user_vote = None
+    if user_id:
+        cur.execute(
+            "SELECT vote_choice FROM legislation_votes WHERE legislation_id = %s AND speaker_id = %s",
+            (leg_id, user_id),
+        )
+        uv = cur.fetchone()
+        user_vote = uv["vote_choice"] if uv else None
+
+    return {
+        "for_count": for_count,
+        "against_count": against_count,
+        "abstain_count": max(0, int(total) - cast_total),
+        "total_speakers": int(total),
+        "cast_count": cast_total,
+        "user_vote": user_vote,
+    }
+
+
 def ensure_timer_schema():
-    with get_db(dictionary=False) as (conn, cur):
+    with get_db() as (conn, cur):
+        cur.execute("SHOW COLUMNS FROM session_state LIKE 'phase'")
+        phase_col = cur.fetchone()
+        phase_type = (phase_col or {}).get("Type", "")
+        if "'voting'" not in phase_type:
+            cur.execute("ALTER TABLE session_state MODIFY COLUMN phase ENUM('idle', 'speech_queue', 'speech_in_progress', 'questioning', 'voting') NOT NULL DEFAULT 'idle'")
+
         cur.execute("SHOW COLUMNS FROM session_state LIKE 'timer_status'")
         if not cur.fetchone():
             cur.execute("ALTER TABLE session_state ADD COLUMN timer_status ENUM('idle', 'running', 'paused', 'stopped') NOT NULL DEFAULT 'idle'")
@@ -326,6 +370,26 @@ def ensure_timer_schema():
         cur.execute("SHOW COLUMNS FROM speeches LIKE 'duration_seconds'")
         if not cur.fetchone():
             cur.execute("ALTER TABLE speeches ADD COLUMN duration_seconds INT NOT NULL DEFAULT 0")
+
+        cur.execute("SHOW COLUMNS FROM legislation LIKE 'vote_result'")
+        if not cur.fetchone():
+            cur.execute("ALTER TABLE legislation ADD COLUMN vote_result ENUM('pending', 'passed', 'failed') NOT NULL DEFAULT 'pending'")
+
+        cur.execute(
+            """
+            CREATE TABLE IF NOT EXISTS legislation_votes (
+                id INT AUTO_INCREMENT PRIMARY KEY,
+                legislation_id INT NOT NULL,
+                speaker_id INT NOT NULL,
+                vote_choice ENUM('for', 'against') NOT NULL,
+                created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                UNIQUE KEY uq_leg_speaker_vote (legislation_id, speaker_id),
+                FOREIGN KEY (legislation_id) REFERENCES legislation(id),
+                FOREIGN KEY (speaker_id) REFERENCES speakers(id)
+            )
+            """
+        )
 
         cur.execute("UPDATE session_state SET timer_status = COALESCE(timer_status, 'idle'), timer_elapsed_seconds = COALESCE(timer_elapsed_seconds, 0) WHERE id = 1")
         conn.commit()
@@ -346,6 +410,7 @@ def api_session_state():
             "question_queue": [],
             "next_side": None,
             "timer": _timer_payload(state),
+            "voting": None,
         }
 
         if not state or not state["active_legislation_id"]:
@@ -354,7 +419,7 @@ def api_session_state():
         leg_id = state["active_legislation_id"]
 
         # Active legislation
-        cur.execute("SELECT id, school, title, body, leg_order, status FROM legislation WHERE id = %s", (leg_id,))
+        cur.execute("SELECT id, school, title, body, leg_order, status, vote_result FROM legislation WHERE id = %s", (leg_id,))
         result["active_legislation"] = cur.fetchone()
 
         # Speeches on this legislation
@@ -422,6 +487,7 @@ def api_session_state():
             result["question_queue"] = qqueue
 
         result["timer"] = _timer_payload(state)
+        result["voting"] = _vote_summary(cur, leg_id, user_id=session.get("user_id"))
 
     return jsonify(result)
 
@@ -441,7 +507,8 @@ def api_session_open_debate():
             "UPDATE session_state SET active_legislation_id = %s, current_speech_id = NULL, phase = 'speech_queue', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1",
             (leg_id,),
         )
-        cur.execute("UPDATE legislation SET status = 'active' WHERE id = %s", (leg_id,))
+        cur.execute("UPDATE legislation SET status = 'active', vote_result = 'pending' WHERE id = %s", (leg_id,))
+        cur.execute("DELETE FROM legislation_votes WHERE legislation_id = %s", (leg_id,))
         conn.commit()
     return jsonify({"ok": True})
 
@@ -453,16 +520,23 @@ def api_session_close_debate():
         return err
 
     with get_db() as (conn, cur):
-        cur.execute("SELECT active_legislation_id FROM session_state WHERE id = 1")
+        cur.execute("SELECT active_legislation_id, current_speech_id FROM session_state WHERE id = 1")
         state = cur.fetchone()
 
-        if state and state["active_legislation_id"]:
-            lid = state["active_legislation_id"]
-            _finalize_active_speech_timer(cur)
-            cur.execute("UPDATE legislation SET status = 'completed' WHERE id = %s", (lid,))
-            cur.execute("UPDATE speech_queue SET status = 'cancelled' WHERE legislation_id = %s AND status = 'waiting'", (lid,))
+        if not state or not state["active_legislation_id"]:
+            return jsonify({"error": "No active legislation"}), 400
+
+        lid = state["active_legislation_id"]
+        _finalize_active_speech_timer(cur)
+        cur.execute("UPDATE speech_queue SET status = 'cancelled' WHERE legislation_id = %s AND status = 'waiting'", (lid,))
+        if state.get("current_speech_id"):
+            cur.execute(
+                "UPDATE question_queue SET status = 'cancelled' WHERE speech_id = %s AND status IN ('waiting','asking')",
+                (state["current_speech_id"],),
+            )
+        cur.execute("DELETE FROM legislation_votes WHERE legislation_id = %s", (lid,))
         cur.execute(
-            "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1"
+            "UPDATE session_state SET current_speech_id = NULL, phase = 'voting', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1"
         )
         conn.commit()
     return jsonify({"ok": True})
@@ -475,12 +549,76 @@ def api_session_reset():
     if err:
         return err
     with get_db(dictionary=False) as (conn, cur):
+        cur.execute("DELETE FROM legislation_votes")
         cur.execute("DELETE FROM question_queue")
         cur.execute("DELETE FROM speech_queue")
         cur.execute("DELETE FROM speeches")
         cur.execute("UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1")
-        cur.execute("UPDATE legislation SET status = 'pending'")
+        cur.execute("UPDATE legislation SET status = 'pending', vote_result = 'pending'")
         conn.commit()
+    return jsonify({"ok": True})
+
+
+@app.post("/api/vote")
+def api_vote_submit():
+    uid = session.get("user_id")
+    if not uid:
+        return jsonify({"error": "Login required"}), 401
+
+    data = request.get_json(silent=True) or {}
+    vote_choice = (data.get("vote_choice") or "").strip().lower()
+    if vote_choice not in ("for", "against"):
+        return jsonify({"error": "vote_choice must be 'for' or 'against'"}), 400
+
+    with get_db() as (conn, cur):
+        cur.execute("SELECT active_legislation_id, phase FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state.get("active_legislation_id"):
+            return jsonify({"error": "No active legislation"}), 400
+        if state.get("phase") != "voting":
+            return jsonify({"error": "Voting is not open"}), 400
+
+        leg_id = state["active_legislation_id"]
+        cur.execute(
+            """
+            INSERT INTO legislation_votes (legislation_id, speaker_id, vote_choice)
+            VALUES (%s, %s, %s)
+            ON DUPLICATE KEY UPDATE vote_choice = VALUES(vote_choice)
+            """,
+            (leg_id, uid, vote_choice),
+        )
+        conn.commit()
+
+        voting = _vote_summary(cur, leg_id, user_id=uid)
+    return jsonify({"ok": True, "voting": voting})
+
+
+@app.post("/api/session/finalize-vote")
+def api_session_finalize_vote():
+    err = po_api_guard()
+    if err:
+        return err
+
+    data = request.get_json(silent=True) or {}
+    result = (data.get("result") or "").strip().lower()
+    if result not in ("passed", "failed"):
+        return jsonify({"error": "result must be 'passed' or 'failed'"}), 400
+
+    with get_db() as (conn, cur):
+        cur.execute("SELECT active_legislation_id, phase FROM session_state WHERE id = 1")
+        state = cur.fetchone()
+        if not state or not state.get("active_legislation_id"):
+            return jsonify({"error": "No active legislation"}), 400
+        if state.get("phase") != "voting":
+            return jsonify({"error": "Not in voting phase"}), 400
+
+        lid = state["active_legislation_id"]
+        cur.execute("UPDATE legislation SET status = 'completed', vote_result = %s WHERE id = %s", (result, lid))
+        cur.execute(
+            "UPDATE session_state SET active_legislation_id = NULL, current_speech_id = NULL, phase = 'idle', timer_status = 'idle', timer_elapsed_seconds = 0, timer_started_at = NULL WHERE id = 1"
+        )
+        conn.commit()
+
     return jsonify({"ok": True})
 
 
@@ -504,6 +642,8 @@ def api_speech_request():
         state = cur.fetchone()
         if not state or not state["active_legislation_id"]:
             return jsonify({"error": "No active legislation"}), 400
+        if state["phase"] not in ("speech_queue", "speech_in_progress"):
+            return jsonify({"error": "Debate is not accepting speech requests"}), 400
 
         leg_id = state["active_legislation_id"]
 

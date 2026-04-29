@@ -6,6 +6,7 @@ USE congress_debate;
 -- Drop in reverse dependency order
 DROP TABLE IF EXISTS question_queue;
 DROP TABLE IF EXISTS speech_queue;
+DROP TABLE IF EXISTS legislation_votes;
 DROP TABLE IF EXISTS speeches;
 DROP TABLE IF EXISTS session_state;
 DROP TABLE IF EXISTS legislation;
@@ -33,6 +34,7 @@ CREATE TABLE legislation (
   body TEXT,
   leg_order INT NOT NULL,
   status ENUM('pending', 'active', 'completed') NOT NULL DEFAULT 'pending',
+  vote_result ENUM('pending', 'passed', 'failed') NOT NULL DEFAULT 'pending',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP
 );
 
@@ -43,7 +45,7 @@ CREATE TABLE session_state (
   id INT PRIMARY KEY DEFAULT 1,
   active_legislation_id INT DEFAULT NULL,
   current_speech_id INT DEFAULT NULL,
-  phase ENUM('idle', 'speech_queue', 'speech_in_progress', 'questioning') NOT NULL DEFAULT 'idle',
+  phase ENUM('idle', 'speech_queue', 'speech_in_progress', 'questioning', 'voting') NOT NULL DEFAULT 'idle',
   timer_status ENUM('idle', 'running', 'paused', 'stopped') NOT NULL DEFAULT 'idle',
   timer_elapsed_seconds INT NOT NULL DEFAULT 0,
   timer_started_at DATETIME DEFAULT NULL
@@ -94,6 +96,21 @@ CREATE TABLE question_queue (
   status ENUM('waiting', 'asking', 'done', 'cancelled') NOT NULL DEFAULT 'waiting',
   created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (speech_id) REFERENCES speeches(id),
+  FOREIGN KEY (speaker_id) REFERENCES speakers(id)
+);
+
+-- =====================================================================
+-- Legislation votes — one vote per speaker per legislation
+-- =====================================================================
+CREATE TABLE legislation_votes (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  legislation_id INT NOT NULL,
+  speaker_id INT NOT NULL,
+  vote_choice ENUM('for', 'against') NOT NULL,
+  created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  UNIQUE KEY uq_leg_speaker_vote (legislation_id, speaker_id),
+  FOREIGN KEY (legislation_id) REFERENCES legislation(id),
   FOREIGN KEY (speaker_id) REFERENCES speakers(id)
 );
 

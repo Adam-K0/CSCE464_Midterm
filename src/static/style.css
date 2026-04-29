@@ -99,6 +99,7 @@ body {
 .badge-green  { background: #dcfce7; color: #166534; }
 .badge-blue   { background: #dbeafe; color: var(--sb-navy); }
 .badge-yellow { background: #fef3c7; color: #92400e; }
+.badge-red    { background: #fee2e2; color: #991b1b; }
 .badge-gray   { background: var(--sb-gray-100); color: var(--sb-gray-600); }
 
 /* --- Form inputs --- */
@@ -265,6 +266,7 @@ textarea.form-input { resize: vertical; min-height: 4rem; }
 .dark .badge-green  { background: rgba(22, 163, 74, 0.2); color: #86efac; }
 .dark .badge-blue   { background: rgba(59, 130, 246, 0.2); color: #93c5fd; }
 .dark .badge-yellow { background: rgba(255, 184, 28, 0.2); color: var(--sb-gold); }
+.dark .badge-red    { background: rgba(200, 16, 46, 0.2); color: #fca5a5; }
 .dark .badge-gray   { background: var(--sb-gray-100); color: var(--sb-gray-600); }
 
 /* --- Dark mode: scrollbar --- */
